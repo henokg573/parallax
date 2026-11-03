@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^node --version; npm --version; node -e \"const n=require\\('\\./node_modules/next/package\\.json'\\); console\\.log\\(JSON\\.stringify\\(n\\.bin\\)\\); const p=require\\('\\./node_modules/payload/package\\.json'\\); console\\.log\\(JSON\\.stringify\\(p\\.bin\\)\\); console\\.log\\('nextPortDefault'\\);\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
