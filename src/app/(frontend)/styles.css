@@ -1044,56 +1044,68 @@ footer {
   width: 1px;
 }
 @media (max-width: 1000px) {
+  .topbar {
+    left: 0;
+    transform: none;
+  }
   .desktop-nav,
-  .header-actions {
+  .header-actions,
+  .menu-button {
     display: none;
   }
-  .menu-button {
-    align-items: center;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    color: #fff;
-    display: flex;
-    height: 42px;
-    justify-content: center;
-    width: 42px;
-  }
   .mobile-nav {
-    background: var(--forest-deep);
-    display: flex;
-    flex-direction: column;
+    align-items: stretch;
+    backdrop-filter: blur(18px);
+    background: rgba(7, 31, 25, 0.94);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
     left: 0;
-    padding: 28px 5vw;
-    position: absolute;
+    padding: 8px max(12px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-bottom));
+    position: fixed;
     right: 0;
-    top: 79px;
+    z-index: 20;
   }
   .mobile-nav a {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+    align-items: center;
     color: #fff;
-    font-size: 14px;
-    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+    font-size: 9px;
+    font-weight: 700;
+    gap: 5px;
+    justify-content: center;
+    min-width: 0;
+    padding: 5px 2px;
     text-decoration: none;
+    text-align: center;
+    white-space: nowrap;
   }
-  .mobile-nav .mobile-cta {
+  .mobile-nav a:first-child,
+  .mobile-nav a:focus-visible,
+  .mobile-nav a:hover {
     color: var(--gold);
   }
   .mobile-language {
     display: flex;
-    gap: 10px;
-    padding-top: 18px;
+    align-items: center;
+    gap: 3px;
+    padding: 0 0 0 7px;
   }
   .mobile-language button {
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    border: 0;
     color: #fff;
     cursor: pointer;
-    padding: 9px 14px;
+    font-size: 8px;
+    font-weight: 700;
+    opacity: 0.55;
+    padding: 6px 3px;
   }
   .mobile-language button[aria-pressed='true'] {
-    background: var(--gold);
-    border-color: var(--gold);
     color: var(--ink);
+    opacity: 1;
   }
   .next-card {
     display: none;

@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { PublicHomeContent } from '@/lib/public-content'
 import { RegistrationForm } from './RegistrationForm'
@@ -266,7 +265,6 @@ function platformLabel(value: string) {
 }
 
 export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicHomeContent> }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const [language, setLanguage] = useState<'en' | 'am'>('en')
   const [subscribed, setSubscribed] = useState(false)
   const [reelIndex, setReelIndex] = useState(0)
@@ -404,57 +402,43 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
             {t.nextExperience} <Icon name="arrow" size={17} />
           </a>
         </div>
-        <button
-          type="button"
-          className="menu-button"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-expanded={menuOpen}
-          aria-label={t.menu}
-        >
-          <Icon name={menuOpen ? 'x' : 'menu'} />
-        </button>
-        {menuOpen && (
-          <nav className="mobile-nav" aria-label="Mobile navigation">
-            <a onClick={() => setMenuOpen(false)} href="#gather">
-              {t.navGather}
-            </a>
-            <a onClick={() => setMenuOpen(false)} href="#events">
-              {t.navExperiences}
-            </a>
-            <a onClick={() => setMenuOpen(false)} href="#story">
-              {t.navStory}
-            </a>
-            <a onClick={() => setMenuOpen(false)} href="#social">
-              {t.navSocial}
-            </a>
-            <div className="mobile-language" aria-label="Language">
-              <button
-                type="button"
-                onClick={() => selectLanguage('en')}
-                aria-pressed={language === 'en'}
-              >
-                English
-              </button>
-              <button
-                type="button"
-                onClick={() => selectLanguage('am')}
-                aria-pressed={language === 'am'}
-              >
-                አማርኛ
-              </button>
-            </div>
-          </nav>
-        )}
+        <nav className="mobile-nav" aria-label="Mobile navigation">
+          <a href="#top" aria-label="Home">
+            <Icon name="mountain" size={18} />
+            <span>Home</span>
+          </a>
+          <a href="#gather" aria-label={t.navGather}>
+            <Icon name="heart" size={18} />
+            <span>{t.navGather}</span>
+          </a>
+          <a href="#events" aria-label={t.navExperiences}>
+            <Icon name="compass" size={18} />
+            <span>{t.navExperiences}</span>
+          </a>
+          <a href="#story" aria-label={t.navStory}>
+            <Icon name="book" size={18} />
+            <span>{t.navStory}</span>
+          </a>
+          <a href="#social" aria-label={t.navSocial}>
+            <Icon name="users" size={18} />
+            <span>{t.navSocial}</span>
+          </a>
+          <div className="mobile-language" aria-label="Language">
+            <button type="button" onClick={() => selectLanguage('en')} aria-pressed={language === 'en'}>
+              EN
+            </button>
+            <button type="button" onClick={() => selectLanguage('am')} aria-pressed={language === 'am'}>
+              አማ
+            </button>
+          </div>
+        </nav>
       </header>
 
       <main>
         <section className="hero" id="top">
-          <Image
+          <img
             src="/images/hero.jpg"
             alt="Friends hiking along a mountain ridge at sunrise"
-            fill
-            priority
-            sizes="100vw"
           />
           <div className="hero-shade" />
           <div className="hero-orbit orbit-one" />
@@ -510,11 +494,9 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                             <video muted playsInline preload="none" aria-hidden src={item.video.url} />
                           )
                         ) : item.image ? (
-                          <Image
+                          <img
                             src={item.image.url}
                             alt={item.image.alt || ''}
-                            fill
-                            sizes="(max-width: 1000px) 92vw, 420px"
                           />
                         ) : (
                           <div className="reel-quote">
@@ -650,11 +632,9 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                           src={event.video.url}
                         />
                       ) : (
-                        <Image
+                        <img
                           src={event.image?.url || '/images/event-hike.jpg'}
                           alt={event.image?.alt || event.title}
-                          fill
-                          sizes="(max-width: 700px) 100vw, 33vw"
                         />
                       )}
                       <span className="event-type">{event.kind}</span>
@@ -729,11 +709,9 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                 src={story.video.url}
               />
             ) : (
-              <Image
+              <img
                 src={story?.image?.url || '/images/story.jpg'}
                 alt={story?.image?.alt || 'Ethiopian highlands'}
-                fill
-                sizes="(max-width: 700px) 100vw, 50vw"
               />
             )}
             <div className="story-quote">
@@ -817,11 +795,9 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                     key={String(post.id)}
                   >
                     {post.thumbnail && (
-                      <Image
+                      <img
                         src={post.thumbnail.url}
                         alt={post.thumbnail.alt || ''}
-                        fill
-                        sizes="(max-width: 700px) 90vw, 25vw"
                       />
                     )}
                     <span>{platformLabel(post.platform)}</span>
