@@ -2,7 +2,7 @@
 @import 'tailwindcss';
 
 html {
-  font-size: 150%;
+  font-size: 120%;
 }
 
 :root {
@@ -13,6 +13,9 @@ html {
   --paper: #fbfaf6;
   --gold: #e4ad4b;
   --line: rgba(16, 46, 38, 0.16);
+}
+.frontend-root {
+  font-size: 1.25rem;
 }
 * {
   scroll-behavior: smooth;
