@@ -14,7 +14,7 @@ import {
   verifyPassword,
   type AdminAccount,
 } from '@/lib/admin-auth'
-import { database, rows, update } from '@/lib/db'
+import { database, insert, rows, update } from '@/lib/db'
 
 function value(formData: FormData, key: string, maxLength: number) {
   const field = formData.get(key)
@@ -318,30 +318,21 @@ export async function saveContent(formData: FormData) {
     if (!caption || !/^https?:\/\//i.test(postURL)) throw new Error('Enter a caption and valid post URL.')
     const imageID = await saveContentImage(formData, section, currentImageID)
     const videoID = await saveContentVideo(formData, currentVideoID)
-    const values = [
+    const values = {
       platform,
-      value(formData, 'caption_en', 5000),
-      value(formData, 'caption_am', 5000),
-      postURL,
-      imageID,
-      videoID,
-      sqlDate(value(formData, 'posted_at', 40)),
-      formData.get('visible') === 'on' ? 1 : 0,
+      caption_en: value(formData, 'caption_en', 5000),
+      caption_am: value(formData, 'caption_am', 5000),
+      post_url: postURL,
+      thumbnail_id: imageID,
+      video_id: videoID,
+      posted_at: sqlDate(value(formData, 'posted_at', 40)),
+      visible: formData.get('visible') === 'on',
       status,
-    ]
+    }
     if (id) {
-      await database.execute(
-        `UPDATE social_posts SET platform=?, caption_en=?, caption_am=?, post_url=?, thumbnail_id=?,
-          video_id=?, posted_at=?, visible=?, status=? WHERE id=?`,
-        [...values, id],
-      )
+      await update('social_posts', values, { id })
     } else {
-      await database.execute(
-        `INSERT INTO social_posts
-          (platform, caption_en, caption_am, post_url, thumbnail_id, video_id, posted_at, visible, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        values,
-      )
+      await insert('social_posts', values)
     }
   }
 
