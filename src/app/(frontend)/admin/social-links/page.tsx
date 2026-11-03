@@ -28,7 +28,7 @@ export const dynamic = 'force-dynamic'
 export default async function SocialLinksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string }>
+  searchParams: Promise<{ saved?: string; error?: string }>
 }) {
   const admin = await requireAdmin('/admin/social-links')
   if (admin.role !== 'super-admin') redirect('/admin')
@@ -50,6 +50,11 @@ export default async function SocialLinksPage({
       {query.saved && (
         <p className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
           Social account links saved.
+        </p>
+      )}
+      {query.error === 'missing-table' && (
+        <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
+          Social accounts are not ready yet. Run <strong>database/migrate-social-links.sql</strong> in the Supabase SQL Editor, then save these links again.
         </p>
       )}
       <form action={saveSocialLinks} className="grid gap-4">

@@ -422,11 +422,8 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
     <div className="site-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Parallax">
-          <span className="brand-mark">
-            <Icon name="mountain" size={24} />
-          </span>
-          <span>
-            <strong>PARALLAX</strong>
+          <img className="brand-logo" src="/logo.jpg" alt="Parallax" />
+        </a>
         <div className="mobile-top-language" aria-label="Language">
           <button type="button" onClick={() => selectLanguage('en')} aria-pressed={language === 'en'}>
             EN
@@ -435,9 +432,6 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
             አማ
           </button>
         </div>
-            <small>{t.tagline}</small>
-          </span>
-        </a>
         <nav className="desktop-nav" aria-label="Main navigation">
           <a href="#gather">{t.navGather}</a>
           <a href="#events">{t.navExperiences}</a>
@@ -908,13 +902,7 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
       <footer>
         <div className="footer-main">
           <a className="brand footer-brand" href="#top">
-            <span className="brand-mark">
-              <Icon name="mountain" size={24} />
-            </span>
-            <span>
-              <strong>PARALLAX</strong>
-              <small>ETHIOPIA</small>
-            </span>
+            <img className="brand-logo" src="/logo.jpg" alt="Parallax" />
           </a>
           <p>
             {t.footerLine1}
