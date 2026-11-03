@@ -409,19 +409,19 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
           </a>
           <a href="#gather" aria-label={t.navGather}>
             <Icon name="heart" size={18} />
-            <span>{t.navGather}</span>
+            <span>{language === 'am' ? 'ማህበረሰብ' : 'Gather'}</span>
           </a>
           <a href="#events" aria-label={t.navExperiences}>
             <Icon name="compass" size={18} />
-            <span>{t.navExperiences}</span>
+            <span>{language === 'am' ? 'ጉዞዎች' : 'Trips'}</span>
           </a>
           <a href="#story" aria-label={t.navStory}>
             <Icon name="book" size={18} />
-            <span>{t.navStory}</span>
+            <span>{language === 'am' ? 'ታሪክ' : 'Story'}</span>
           </a>
           <a href="#social" aria-label={t.navSocial}>
             <Icon name="users" size={18} />
-            <span>{t.navSocial}</span>
+            <span>{language === 'am' ? 'ማህበራዊ' : 'Social'}</span>
           </a>
           <div className="mobile-language" aria-label="Language">
             <button type="button" onClick={() => selectLanguage('en')} aria-pressed={language === 'en'}>
