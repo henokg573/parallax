@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import type { PublicHomeContent } from '@/lib/public-content'
+import type { PublicHomeContent, PublicMedia, PublicVideo } from '@/lib/public-content'
 import { RegistrationForm } from './RegistrationForm'
 
 type IconName =
@@ -316,10 +316,22 @@ function platformLabel(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
+type ReelItem = {
+  key: string
+  href: string
+  platform: string
+  kind: 'social' | 'story' | 'experience'
+  experienceID?: string
+  video: PublicVideo | null
+  image: PublicMedia | null
+  caption: string
+}
+
 export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicHomeContent> }) {
   const [language, setLanguage] = useState<'en' | 'am'>('en')
   const [subscribed, setSubscribed] = useState(false)
   const [reelIndex, setReelIndex] = useState(0)
+  const [registrationExperienceID, setRegistrationExperienceID] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const { experiences, stories, socialPosts, socialLinks } = content[language]
   const t = copy[language]
@@ -327,10 +339,11 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
   const story = stories[0]
 
   // Build the hero reel from published admin content: videos, photos, and social posts.
-  const reelItems = socialPosts.slice(0, 8).map((post) => ({
+  const reelItems: ReelItem[] = socialPosts.slice(0, 8).map((post) => ({
     key: `post-${post.id}`,
     href: post.postURL,
     platform: post.platform,
+    kind: 'social' as const,
     video: post.video,
     image: post.thumbnail,
     caption: post.caption,
@@ -340,6 +353,7 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
       key: 'story-video',
       href: '#story',
       platform: 'story',
+      kind: 'story' as const,
       video: stories[0].video,
       image: stories[0].image,
       caption: stories[0].title,
@@ -350,6 +364,7 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
       key: 'story-photo',
       href: '#story',
       platform: 'story',
+      kind: 'story' as const,
       video: null,
       image: stories[0].image,
       caption: stories[0].title,
@@ -362,6 +377,8 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
         key: `event-${event.id}-video`,
         href: '#events',
         platform: event.kind,
+        kind: 'experience' as const,
+        experienceID: String(event.id),
         video: event.video,
         image: event.image,
         caption: event.title,
@@ -372,6 +389,8 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
         key: `event-${event.id}-photo`,
         href: '#events',
         platform: event.kind,
+        kind: 'experience' as const,
+        experienceID: String(event.id),
         video: null,
         image: event.image,
         caption: event.title,
@@ -570,12 +589,26 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                   ))}
                 </div>
                 <div className="reel-follow">
-                  <a className="button button-gold reel-follow-button" href="#social">
-                    <Icon name="heart" size={15} /> {t.reelFollow}
-                  </a>
-                  <a className="text-link" href="#social">
-                    {t.reelWatch} <Icon name="arrow" size={14} />
-                  </a>
+                  {reelItems[reelIndex]?.kind === 'experience' ? (
+                    <a
+                      className="button button-gold reel-follow-button"
+                      href="#events"
+                      onClick={() => {
+                        setRegistrationExperienceID(reelItems[reelIndex]?.experienceID || null)
+                      }}
+                    >
+                      <Icon name="check" size={15} /> {t.register}
+                    </a>
+                  ) : (
+                    <>
+                      <a className="button button-gold reel-follow-button" href="#social">
+                        <Icon name="heart" size={15} /> {t.reelFollow}
+                      </a>
+                      <a className="text-link" href="#social">
+                        {t.reelWatch} <Icon name="arrow" size={14} />
+                      </a>
+                    </>
+                  )}
                 </div>
               </aside>
             )}
@@ -712,7 +745,14 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                           {t.externalRegistration} <Icon name="arrow" size={16} />
                         </a>
                       )}
-                      <details className="registration-panel">
+                        <details
+                          className="registration-panel"
+                          id={`registration-${event.id}`}
+                          open={registrationExperienceID === String(event.id)}
+                          onToggle={(toggleEvent) => {
+                            if (!toggleEvent.currentTarget.open) setRegistrationExperienceID(null)
+                          }}
+                        >
                         <summary>{t.register}</summary>
                         <RegistrationForm experienceID={String(event.id)} locale={language} />
                       </details>
