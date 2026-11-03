@@ -79,7 +79,11 @@ export default async function AnnouncementsPage({
   const admin = await requireAdmin('/admin/announcements')
   if (admin.role !== 'super-admin') redirect('/admin')
 
-  const records = await rows<AnnouncementRow>('SELECT * FROM announcements ORDER BY created_at DESC LIMIT 100')
+  const records = await rows<AnnouncementRow>('announcements', {
+    select: '*',
+    order: { column: 'created_at', ascending: false },
+    limit: 100,
+  })
   const query = await searchParams
   const siteURL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
   const withQR = await Promise.all(

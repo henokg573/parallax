@@ -1,4 +1,5 @@
 import { rows } from '@/lib/db'
+import { publicMediaURL } from '@/lib/storage'
 
 export type PublicMedia = {
   url: string
@@ -53,6 +54,13 @@ export type PublicHomeContent = {
   experiences: PublicExperience[]
   stories: PublicStory[]
   socialPosts: PublicSocialPost[]
+  socialLinks: SocialLink[]
+}
+
+export type SocialLink = {
+  platform: string
+  url: string
+  visible: boolean
 }
 
 type ExperienceRow = {
@@ -111,7 +119,7 @@ type MediaRow = {
 function mediaValue(media: MediaRow | undefined): PublicMedia | null {
   if (!media) return null
   return {
-    url: `/uploads/media/${encodeURIComponent(media.filename)}`,
+    url: publicMediaURL(media.filename),
     alt: media.alt || '',
     width: media.width || 1600,
     height: media.height || 1000,
@@ -121,14 +129,14 @@ function mediaValue(media: MediaRow | undefined): PublicMedia | null {
 function videoValue(media: MediaRow | undefined): PublicVideo | null {
   if (!media) return null
   return {
-    url: `/uploads/media/${encodeURIComponent(media.filename)}`,
+    url: publicMediaURL(media.filename),
     alt: media.alt || '',
     mimeType: media.mime_type,
   }
 }
 
 export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicHomeContent> {
-  const [experiences, stories, socialPosts] = await Promise.all([
+  const [experiences, stories, socialPosts, socialLinks] = await Promise.all([
     rows<ExperienceRow>('experiences', {
       select: 'id, title_en, title_am, kind, summary_en, summary_am, location_en, location_am, start_date, end_date, capacity, price, currency, registration_url, image_id, video_id',
       eq: { status: 'published' }, order: { column: 'start_date' }, limit: 6,
@@ -141,6 +149,11 @@ export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicH
       select: 'id, platform, caption_en, caption_am, post_url, posted_at, thumbnail_id, video_id',
       eq: { status: 'published', visible: true }, order: { column: 'posted_at', ascending: false }, limit: 5,
     }),
+    rows<SocialLink>('social_links', {
+      select: 'platform, url, visible',
+      eq: { visible: true },
+      order: { column: 'platform' },
+    }).catch(() => []),
   ])
 
   const mediaIDs = [...experiences.flatMap((item) => [item.image_id, item.video_id]), ...stories.flatMap((item) => [item.image_id, item.video_id]), ...socialPosts.flatMap((item) => [item.thumbnail_id, item.video_id])]
@@ -185,5 +198,6 @@ export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicH
       thumbnail: mediaValue(mediaByID.get(item.thumbnail_id ?? -1)),
       video: videoValue(mediaByID.get(item.video_id ?? -1)),
     })),
+    socialLinks,
   }
 }

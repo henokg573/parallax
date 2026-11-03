@@ -1,6 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Playfair+Display:ital,wght@1,500&display=swap');
 @import 'tailwindcss';
 
+html {
+  font-size: 150%;
+}
+
 :root {
   --ink: #102e26;
   --forest: #123c31;

@@ -1,8 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import type { RowDataPacket } from 'mysql2/promise'
-import { database } from '@/lib/db'
+import { rows, update } from '@/lib/db'
 import { getAdminSession } from '@/lib/admin-auth'
 
 export async function confirmCheckIn(token: string) {
@@ -10,25 +9,15 @@ export async function confirmCheckIn(token: string) {
     redirect(`/admin/login?next=${encodeURIComponent(`/check-in/${token}`)}`)
   }
 
-  const connection = await database.getConnection()
-  let validTicket = false
-  try {
-    await connection.beginTransaction()
-    const [tickets] = await connection.execute<Array<RowDataPacket & { id: number; payment_status: string; checked_in_at: string | null }>>(
-      'SELECT id, payment_status, checked_in_at FROM registrations WHERE check_in_token = ? LIMIT 1 FOR UPDATE',
-      [token],
-    )
-    const ticket = tickets[0]
-    validTicket = ticket?.payment_status === 'verified'
-    if (validTicket && !ticket.checked_in_at) {
-      await connection.execute('UPDATE registrations SET checked_in_at = NOW() WHERE id = ?', [ticket.id])
-    }
-    await connection.commit()
-  } catch (error) {
-    await connection.rollback()
-    throw error
-  } finally {
-    connection.release()
+  const tickets = await rows<{ id: number; payment_status: string; checked_in_at: string | null }>('registrations', {
+    select: 'id, payment_status, checked_in_at',
+    eq: { check_in_token: token },
+    limit: 1,
+  })
+  const ticket = tickets[0]
+  const validTicket = ticket?.payment_status === 'verified'
+  if (validTicket && !ticket.checked_in_at) {
+    await update('registrations', { checked_in_at: new Date().toISOString() }, { id: ticket.id })
   }
 
   if (!validTicket) redirect(`/check-in/${token}?error=invalid`)

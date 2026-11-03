@@ -18,10 +18,11 @@ export default async function AnnouncementPage({ params }: { params: Promise<{ t
   const { token } = await params
   if (!/^[0-9a-f-]{36}$/i.test(token)) notFound()
 
-  const result = await rows<AnnouncementRow>(
-    "SELECT id, title, message, link_url, link_label, status FROM announcements WHERE share_token = ? AND status = 'published' LIMIT 1",
-    [token],
-  )
+  const result = await rows<AnnouncementRow>('announcements', {
+    select: 'id, title, message, link_url, link_label, status',
+    eq: { share_token: token, status: 'published' },
+    limit: 1,
+  })
   const announcement = result[0]
   if (!announcement) notFound()
 

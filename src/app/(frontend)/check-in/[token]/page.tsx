@@ -26,15 +26,19 @@ export default async function CheckInPage({
     redirect(`/admin/login?next=${encodeURIComponent(`/check-in/${token}`)}`)
   }
 
-  const found = await rows<CheckInRow>(
-    `SELECT r.id, r.full_name, r.payment_status, r.ticket_email_sent_at, r.checked_in_at,
-      COALESCE(NULLIF(e.title_en, ''), 'Parallax experience') AS experience_title
-     FROM registrations r JOIN experiences e ON e.id = r.experience_id
-     WHERE r.check_in_token = ? LIMIT 1`,
-    [token],
-  )
+  const found = await rows<CheckInRow & { experience_id: number }>('registrations', {
+    select: 'id, full_name, payment_status, ticket_email_sent_at, checked_in_at, experience_id',
+    eq: { check_in_token: token },
+    limit: 1,
+  })
   const registration = found[0]
   if (!registration) notFound()
+  const experiences = await rows<{ title_en: string }>('experiences', {
+    select: 'title_en',
+    eq: { id: registration.experience_id },
+    limit: 1,
+  })
+  registration.experience_title = experiences[0]?.title_en || 'Parallax experience'
 
   const verified = registration.payment_status === 'verified'
   const checkedIn = Boolean(registration.checked_in_at || query.checked === '1')

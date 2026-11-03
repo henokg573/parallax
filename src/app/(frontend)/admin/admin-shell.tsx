@@ -132,6 +132,19 @@ export default function AdminShell({
                   {active === '/admin/announcements' && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400" />}
                 </a>
                 <a
+                  className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${active === '/admin/social-links'
+                      ? 'bg-emerald-500/10 text-emerald-300'
+                      : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+                    }`}
+                  href="/admin/social-links"
+                >
+                  <svg className={`h-5 w-5 shrink-0 ${active === '/admin/social-links' ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Social accounts
+                  {active === '/admin/social-links' && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400" />}
+                </a>
+                <a
                   className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${active === '/admin/admins'
                       ? 'bg-emerald-500/10 text-emerald-300'
                       : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
