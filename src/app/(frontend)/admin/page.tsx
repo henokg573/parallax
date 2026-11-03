@@ -1,4 +1,3 @@
-import type { RowDataPacket } from 'mysql2/promise'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { logoutAdmin } from './actions'
@@ -8,45 +7,66 @@ import AdminShell, { roleLabel } from './admin-shell'
 
 export const dynamic = 'force-dynamic'
 
-type CountRow = RowDataPacket & { total: number }
-type UpcomingRow = RowDataPacket & { id: number; title_en: string; start_date: string; kind: string; capacity: number | null; price: number | null; currency: string | null }
-type StoryRow = RowDataPacket & { id: number; title_en: string; published_at: string | null; status: string }
-type PendingRow = RowDataPacket & {
+type UpcomingRow = { id: number; title_en: string; start_date: string; kind: string; capacity: number | null; price: number | null; currency: string | null }
+type StoryRow = { id: number; title_en: string; published_at: string | null; status: string }
+type PendingRegistration = {
   id: number
   full_name: string
-  experience_title: string
+  experience_id: number
   created_at: string
 }
+type PendingRow = PendingRegistration & { experience_title: string }
 
 export default async function AdminHomePage() {
   const admin = await requireAdmin()
   if (admin.role === 'check-in') redirect('/admin/registrations')
 
-  const [pending, verified, checkedIn, draftExperiences, experienceCount, storyCount, upcoming, recentStories, recentPending] = await Promise.all([
-    rows<CountRow>("SELECT COUNT(*) AS total FROM registrations WHERE payment_status = 'pending'"),
-    rows<CountRow>("SELECT COUNT(*) AS total FROM registrations WHERE payment_status = 'verified'"),
-    rows<CountRow>('SELECT COUNT(*) AS total FROM registrations WHERE checked_in_at IS NOT NULL'),
-    rows<CountRow>("SELECT COUNT(*) AS total FROM experiences WHERE status = 'draft'"),
-    rows<CountRow>("SELECT COUNT(*) AS total FROM experiences WHERE status = 'published'"),
-    rows<CountRow>("SELECT COUNT(*) AS total FROM stories WHERE status = 'published'"),
-    rows<UpcomingRow>(
-      "SELECT id, title_en, start_date, kind, capacity, price, currency FROM experiences WHERE status = 'published' AND start_date >= NOW() ORDER BY start_date LIMIT 1",
-    ),
-    rows<StoryRow>('SELECT id, title_en, published_at, status FROM stories ORDER BY COALESCE(published_at, created_at) DESC LIMIT 4'),
-    rows<PendingRow>(
-      `SELECT r.id, r.full_name, r.created_at, e.title_en AS experience_title
-       FROM registrations r JOIN experiences e ON e.id = r.experience_id
-       WHERE r.payment_status = 'pending' ORDER BY r.created_at DESC LIMIT 5`,
-    ),
+  const [pending, verified, checkedIn, draftExperiences, experienceCount, storyCount, upcoming, recentStories, pendingRegistrations] = await Promise.all([
+    rows<{ id: number }>('registrations', { select: 'id', eq: { payment_status: 'pending' } }),
+    rows<{ id: number }>('registrations', { select: 'id', eq: { payment_status: 'verified' } }),
+    rows<{ id: number }>('registrations', { select: 'id', notNull: ['checked_in_at'] }),
+    rows<{ id: number }>('experiences', { select: 'id', eq: { status: 'draft' } }),
+    rows<{ id: number }>('experiences', { select: 'id', eq: { status: 'published' } }),
+    rows<{ id: number }>('stories', { select: 'id', eq: { status: 'published' } }),
+    rows<UpcomingRow>('experiences', {
+      select: 'id, title_en, start_date, kind, capacity, price, currency',
+      eq: { status: 'published' },
+      gte: { start_date: new Date().toISOString() },
+      order: { column: 'start_date' },
+      limit: 1,
+    }),
+    rows<StoryRow>('stories', {
+      select: 'id, title_en, published_at, status',
+      order: { column: 'published_at', ascending: false },
+      limit: 4,
+    }),
+    rows<PendingRegistration>('registrations', {
+      select: 'id, full_name, experience_id, created_at',
+      eq: { payment_status: 'pending' },
+      order: { column: 'created_at', ascending: false },
+      limit: 5,
+    }),
   ])
+  const pendingExperienceIDs = pendingRegistrations.map((item) => item.experience_id)
+  const pendingExperiences = pendingExperienceIDs.length
+    ? await rows<{ id: number; title_en: string }>('experiences', {
+        select: 'id, title_en',
+        in: { id: pendingExperienceIDs },
+      })
+    : []
+  const experienceTitles = new Map(pendingExperiences.map((item) => [item.id, item.title_en]))
+  const recentPending: PendingRow[] = pendingRegistrations.map((item) => ({
+    ...item,
+    experience_title: experienceTitles.get(item.experience_id) || 'Parallax experience',
+  }))
 
   const totals = [
-    { label: 'Pending payments', value: pending[0]?.total || 0, href: '/admin/registrations', accent: 'text-amber-600', bg: 'bg-amber-50', dot: 'bg-amber-500' },
-    { label: 'Verified tickets', value: verified[0]?.total || 0, href: '/admin/registrations', accent: 'text-emerald-600', bg: 'bg-emerald-50', dot: 'bg-emerald-500' },
-    { label: 'Guests checked in', value: checkedIn[0]?.total || 0, href: '/admin/scan', accent: 'text-sky-600', bg: 'bg-sky-50', dot: 'bg-sky-500' },
-    { label: 'Live experiences', value: experienceCount[0]?.total || 0, href: '/admin/experiences', accent: 'text-violet-600', bg: 'bg-violet-50', dot: 'bg-violet-500' },
-    { label: 'Draft experiences', value: draftExperiences[0]?.total || 0, href: '/admin/experiences', accent: 'text-zinc-600', bg: 'bg-zinc-100', dot: 'bg-zinc-400' },
-    { label: 'Published stories', value: storyCount[0]?.total || 0, href: '/admin/stories', accent: 'text-rose-600', bg: 'bg-rose-50', dot: 'bg-rose-500' },
+    { label: 'Pending payments', value: pending.length, href: '/admin/registrations', accent: 'text-amber-600', bg: 'bg-amber-50', dot: 'bg-amber-500' },
+    { label: 'Verified tickets', value: verified.length, href: '/admin/registrations', accent: 'text-emerald-600', bg: 'bg-emerald-50', dot: 'bg-emerald-500' },
+    { label: 'Guests checked in', value: checkedIn.length, href: '/admin/scan', accent: 'text-sky-600', bg: 'bg-sky-50', dot: 'bg-sky-500' },
+    { label: 'Live experiences', value: experienceCount.length, href: '/admin/experiences', accent: 'text-violet-600', bg: 'bg-violet-50', dot: 'bg-violet-500' },
+    { label: 'Draft experiences', value: draftExperiences.length, href: '/admin/experiences', accent: 'text-zinc-600', bg: 'bg-zinc-100', dot: 'bg-zinc-400' },
+    { label: 'Published stories', value: storyCount.length, href: '/admin/stories', accent: 'text-rose-600', bg: 'bg-rose-50', dot: 'bg-rose-500' },
   ]
   const upcomingExperience = upcoming[0]
 
@@ -136,9 +156,9 @@ export default async function AdminHomePage() {
           ) : (
             <p className="mt-4 rounded-xl border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500">All caught up — no pending payments.</p>
           )}
-          {(pending[0]?.total || 0) > 0 && (
+          {pending.length > 0 && (
             <Link className="mt-4 block rounded-xl bg-amber-50 px-4 py-2.5 text-center text-sm font-semibold text-amber-900 transition hover:bg-amber-100" href="/admin/registrations">
-              Review {pending[0].total} pending payment{(pending[0]?.total || 0) === 1 ? '' : 's'} →
+              Review {pending.length} pending payment{pending.length === 1 ? '' : 's'} →
             </Link>
           )}
         </section>
