@@ -82,7 +82,8 @@ async function saveContentImage(formData: FormData, section: 'experience' | 'sto
   if (!extension) throw new Error('Upload a JPEG, PNG, WebP, or GIF image.')
 
   const alt = value(formData, 'image_alt', 255)
-  if (!alt) throw new Error('Enter alternative text for the image.')
+    || value(formData, section === 'social' ? 'caption_en' : 'title_en', 255)
+    || 'Parallax image'
   const { default: sharp } = await import('sharp')
   const buffer = Buffer.from(await file.arrayBuffer())
   const metadata = await sharp(buffer).metadata()
