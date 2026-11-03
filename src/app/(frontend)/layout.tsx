@@ -51,7 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Skip to content
           </a>
         )}
-        <div id="root" tabIndex={-1}>
+        <div id="root" className="frontend-root" tabIndex={-1}>
           {children}
         </div>
         {googleAnalyticsId && (
