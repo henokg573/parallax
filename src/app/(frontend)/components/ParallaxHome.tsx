@@ -321,7 +321,7 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
   const [subscribed, setSubscribed] = useState(false)
   const [reelIndex, setReelIndex] = useState(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
-  const { experiences, stories, socialPosts } = content[language]
+  const { experiences, stories, socialPosts, socialLinks } = content[language]
   const t = copy[language]
   const featured = experiences[0]
   const story = stories[0]
@@ -928,9 +928,9 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
             <a href="#social">{t.navSocial}</a>
           </nav>
           <div className="socials">
-            {(['telegram', 'whatsapp', 'linkedin', 'tiktok', 'instagram', 'youtube', 'x', 'snapchat'] as const).map((platform) => (
-              <a aria-label={platform} href="#social" key={platform}>
-                <SocialIcon platform={platform} />
+            {socialLinks.map((link) => (
+              <a aria-label={link.platform} href={link.url} key={link.platform} target="_blank" rel="noreferrer">
+                <SocialIcon platform={link.platform as SocialPlatform} />
               </a>
             ))}
           </div>

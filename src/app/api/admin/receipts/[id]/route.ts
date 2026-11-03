@@ -1,9 +1,8 @@
-import { readFile } from 'node:fs/promises'
-import path from 'node:path'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { RowDataPacket } from 'mysql2/promise'
 import { getAdminSession } from '@/lib/admin-auth'
 import { rows } from '@/lib/db'
+import { downloadStorageFile, PRIVATE_RECEIPTS_BUCKET } from '@/lib/storage'
 
 export const runtime = 'nodejs'
 
@@ -28,18 +27,17 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const receipts = await rows<ReceiptRow>(
-    'SELECT p.filename, p.mime_type, p.original_filename FROM payment_receipts p JOIN registrations r ON r.receipt_id = p.id WHERE p.id = ? LIMIT 1',
-    [id],
-  )
+  const receipts = await rows<ReceiptRow>('payment_receipts', {
+    select: 'filename, mime_type, original_filename',
+    eq: { id },
+    limit: 1,
+  })
   const receipt = receipts[0]
   if (!receipt || !['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(receipt.mime_type)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const filename = path.basename(receipt.filename)
-  const filePath = path.join(process.cwd(), 'var', 'uploads', 'payment-receipts', filename)
-  const content = await readFile(filePath).catch(() => null)
+  const content = await downloadStorageFile(PRIVATE_RECEIPTS_BUCKET, receipt.filename)
   if (!content) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return new NextResponse(content, {

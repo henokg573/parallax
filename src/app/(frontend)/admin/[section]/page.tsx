@@ -1,14 +1,14 @@
-import type { RowDataPacket } from 'mysql2/promise'
 import QRCode from 'qrcode'
 import { redirect } from 'next/navigation'
 import { createAdmin, archiveContent, deleteAdmin, deleteContent, deleteMedia, restoreContent, saveContent, updateRegistration, uploadMedia } from '../actions'
 import { requireAdmin } from '@/lib/admin-auth'
 import { rows } from '@/lib/db'
+import { publicMediaURL } from '@/lib/storage'
 import AdminShell, { roleLabel } from '../admin-shell'
 
 export const dynamic = 'force-dynamic'
 
-type AdminRecord = RowDataPacket & Record<string, string | number | null>
+type AdminRecord = Record<string, string | number | null>
 type Field = {
   name: string
   label: string
@@ -146,7 +146,7 @@ async function getSectionRecords(sectionName: SectionName): Promise<AdminRecord[
       ...record,
       experience_title: experienceTitles.get(Number(record.experience_id)) || 'Parallax experience',
       receipt_name: receiptNames.get(Number(record.receipt_id)) || 'Receipt',
-    }))
+    })) as AdminRecord[]
   }
 
   const table = sectionName === 'experiences' ? 'experiences' : sectionName === 'stories' ? 'stories' : 'social_posts'
@@ -175,7 +175,7 @@ async function getSectionRecords(sectionName: SectionName): Promise<AdminRecord[
       video_filename: video?.filename || null,
       video_alt: video?.alt || null,
     }
-  })
+  }) as AdminRecord[]
 }
 
 const inputClass = 'mt-1.5 w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15'
@@ -258,7 +258,7 @@ function ContentForm({
           <div className="flex items-center gap-3">
             <img
               className="h-16 w-24 rounded-lg border border-zinc-200 object-cover"
-              src={`/uploads/media/${encodeURIComponent(String(record.image_filename))}`}
+              src={publicMediaURL(String(record.image_filename))}
               alt={String(record.image_alt || '')}
             />
             <span className="text-xs text-zinc-600">Current image · media {section === 'social' ? record.thumbnail_id : record.image_id}</span>
@@ -302,7 +302,7 @@ function ContentForm({
               className="aspect-video w-full max-w-xl rounded-xl border border-zinc-200 bg-black"
               controls
               preload="metadata"
-              src={`/uploads/media/${encodeURIComponent(String(record.video_filename))}`}
+              src={publicMediaURL(String(record.video_filename))}
             />
             <span className="text-xs text-zinc-600">Current video · media {record.video_id}</span>
           </div>
@@ -461,9 +461,9 @@ export default async function AdminSectionPage({
             {records.map((record) => (
               <Card className="overflow-hidden" key={record.id}>
                 {String(record.mime_type).startsWith('video/') ? (
-                  <video className="aspect-[4/3] w-full bg-black object-cover" controls preload="metadata" src={`/uploads/media/${encodeURIComponent(String(record.filename))}`} />
+                  <video className="aspect-[4/3] w-full bg-black object-cover" controls preload="metadata" src={publicMediaURL(String(record.filename))} />
                 ) : (
-                  <img className="aspect-[4/3] w-full object-cover" src={`/uploads/media/${encodeURIComponent(String(record.filename))}`} alt={String(record.alt || '')} />
+                  <img className="aspect-[4/3] w-full object-cover" src={publicMediaURL(String(record.filename))} alt={String(record.alt || '')} />
                 )}
                 <div className="p-3.5">
                   <p className="truncate text-xs font-semibold text-zinc-800">{String(record.alt || record.original_filename || record.filename)}</p>
@@ -545,7 +545,7 @@ export default async function AdminSectionPage({
                 <details>
                   <summary className="flex cursor-pointer flex-wrap items-center gap-3 px-4 py-4 sm:px-5">
                     {record.image_filename ? (
-                      <img className="h-10 w-14 shrink-0 rounded-lg border border-zinc-200 object-cover" src={`/uploads/media/${encodeURIComponent(String(record.image_filename))}`} alt="" />
+                      <img className="h-10 w-14 shrink-0 rounded-lg border border-zinc-200 object-cover" src={publicMediaURL(String(record.image_filename))} alt="" />
                     ) : (
                       <span className="flex h-10 w-14 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-xs text-zinc-400">{section.kind === 'social' ? '🔗' : '📄'}</span>
                     )}

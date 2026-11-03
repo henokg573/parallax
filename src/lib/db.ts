@@ -21,6 +21,7 @@ export async function rows<T = any>(
   options?: {
     select?: string
     eq?: Record<string, unknown>
+    neq?: Record<string, unknown>
     in?: Record<string, unknown[]>
     gte?: Record<string, unknown>
     notNull?: string[]
@@ -36,6 +37,12 @@ export async function rows<T = any>(
   if (options?.eq) {
     for (const [col, val] of Object.entries(options.eq)) {
       query = query.eq(col, val)
+    }
+  }
+
+  if (options?.neq) {
+    for (const [col, val] of Object.entries(options.neq)) {
+      query = query.neq(col, val)
     }
   }
 

@@ -1,8 +1,6 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
-import { mkdir, unlink, writeFile } from 'node:fs/promises'
-import path from 'node:path'
 import QRCode from 'qrcode'
 import { redirect } from 'next/navigation'
 import type { RowDataPacket } from 'mysql2/promise'
@@ -14,7 +12,8 @@ import {
   verifyPassword,
   type AdminAccount,
 } from '@/lib/admin-auth'
-import { database, insert, remove, rows, update } from '@/lib/db'
+import { insert, remove, rows, update } from '@/lib/db'
+import { PUBLIC_MEDIA_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
 
 function value(formData: FormData, key: string, maxLength: number) {
   const field = formData.get(key)
@@ -90,20 +89,21 @@ async function saveContentImage(formData: FormData, section: 'experience' | 'sto
   if (!metadata.width || !metadata.height) throw new Error('The image could not be decoded.')
 
   const filename = `${randomUUID()}.${extension}`
-  const directory = path.join(process.cwd(), 'public', 'uploads', 'media')
-  await mkdir(directory, { recursive: true })
-  const filePath = path.join(directory, filename)
-  await writeFile(filePath, buffer, { flag: 'wx' })
+  await uploadStorageFile(PUBLIC_MEDIA_BUCKET, filename, buffer, file.type)
 
   try {
-    const [result] = await database.execute(
-      `INSERT INTO media (filename, original_filename, mime_type, size_bytes, width, height, alt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [filename, file.name.replace(/[/\\\0]/g, '').slice(0, 255), file.type, file.size, metadata.width, metadata.height, alt],
-    )
-    return (result as { insertId: number }).insertId
+    const result = await insert<{ id: number }>('media', {
+      filename,
+      original_filename: file.name.replace(/[/\\\0]/g, '').slice(0, 255),
+      mime_type: file.type,
+      size_bytes: file.size,
+      width: metadata.width,
+      height: metadata.height,
+      alt,
+    })
+    return result.id
   } catch (error) {
-    await unlink(filePath).catch(() => undefined)
+    await removeStorageFile(PUBLIC_MEDIA_BUCKET, filename).catch(() => undefined)
     throw error
   }
 }
@@ -131,20 +131,19 @@ async function saveContentVideo(formData: FormData, currentID: number | null) {
   if (!validSignature) throw new Error('The video file content does not match its format.')
 
   const filename = `${randomUUID()}.${extension}`
-  const directory = path.join(process.cwd(), 'public', 'uploads', 'media')
-  await mkdir(directory, { recursive: true })
-  const filePath = path.join(directory, filename)
-  await writeFile(filePath, buffer, { flag: 'wx' })
+  await uploadStorageFile(PUBLIC_MEDIA_BUCKET, filename, buffer, file.type)
 
   try {
-    const [result] = await database.execute(
-      `INSERT INTO media (filename, original_filename, mime_type, size_bytes, alt)
-       VALUES (?, ?, ?, ?, ?)`,
-      [filename, file.name.replace(/[/\\\0]/g, '').slice(0, 255), file.type, file.size, alt],
-    )
-    return (result as { insertId: number }).insertId
+    const result = await insert<{ id: number }>('media', {
+      filename,
+      original_filename: file.name.replace(/[/\\\0]/g, '').slice(0, 255),
+      mime_type: file.type,
+      size_bytes: file.size,
+      alt,
+    })
+    return result.id
   } catch (error) {
-    await unlink(filePath).catch(() => undefined)
+    await removeStorageFile(PUBLIC_MEDIA_BUCKET, filename).catch(() => undefined)
     throw error
   }
 }
@@ -227,41 +226,30 @@ export async function saveContent(formData: FormData) {
     }
     const imageID = await saveContentImage(formData, section, currentImageID)
     const videoID = await saveContentVideo(formData, currentVideoID)
-    const values = [
-      slugify(value(formData, 'slug', 190) || title),
-      title,
-      value(formData, 'title_am', 200),
+    const values = {
+      slug: slugify(value(formData, 'slug', 190) || title),
+      title_en: title,
+      title_am: value(formData, 'title_am', 200),
       kind,
-      value(formData, 'summary_en', 5000),
-      value(formData, 'summary_am', 5000),
-      value(formData, 'location_en', 200),
-      value(formData, 'location_am', 200),
-      sqlDate(value(formData, 'start_date', 40)),
-      sqlDate(value(formData, 'end_date', 40), true),
+      summary_en: value(formData, 'summary_en', 5000),
+      summary_am: value(formData, 'summary_am', 5000),
+      location_en: value(formData, 'location_en', 200),
+      location_am: value(formData, 'location_am', 200),
+      start_date: sqlDate(value(formData, 'start_date', 40)),
+      end_date: sqlDate(value(formData, 'end_date', 40), true),
       capacity,
       price,
       currency,
-      value(formData, 'registration_url', 1000) || null,
-      imageID,
-      videoID,
-      formData.get('featured') === 'on' ? 1 : 0,
+      registration_url: value(formData, 'registration_url', 1000) || null,
+      image_id: imageID,
+      video_id: videoID,
+      featured: formData.get('featured') === 'on',
       status,
-    ]
+    }
     if (id) {
-      await database.execute(
-        `UPDATE experiences SET slug=?, title_en=?, title_am=?, kind=?, summary_en=?, summary_am=?,
-          location_en=?, location_am=?, start_date=?, end_date=?, capacity=?, price=?, currency=?,
-          registration_url=?, image_id=?, video_id=?, featured=?, status=? WHERE id=?`,
-        [...values, id],
-      )
+      await update('experiences', values, { id })
     } else {
-      await database.execute(
-        `INSERT INTO experiences
-          (slug, title_en, title_am, kind, summary_en, summary_am, location_en, location_am,
-           start_date, end_date, capacity, price, currency, registration_url, image_id, video_id, featured, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        values,
-      )
+      await insert('experiences', values)
     }
   }
 
@@ -274,37 +262,26 @@ export async function saveContent(formData: FormData) {
     const publishedAt = publishedAtValue ? sqlDate(publishedAtValue) : status === 'published' ? new Date() : null
     const imageID = await saveContentImage(formData, section, currentImageID)
     const videoID = await saveContentVideo(formData, currentVideoID)
-    const values = [
-      slugify(value(formData, 'slug', 190) || title),
-      title,
-      value(formData, 'title_am', 200),
-      value(formData, 'excerpt_en', 5000),
-      value(formData, 'excerpt_am', 5000),
-      value(formData, 'body_en', 50000),
-      value(formData, 'body_am', 50000),
-      value(formData, 'author_name_en', 160),
-      value(formData, 'author_name_am', 160),
-      imageID,
-      videoID,
-      publishedAt,
-      formData.get('featured') === 'on' ? 1 : 0,
+    const values = {
+      slug: slugify(value(formData, 'slug', 190) || title),
+      title_en: title,
+      title_am: value(formData, 'title_am', 200),
+      excerpt_en: value(formData, 'excerpt_en', 5000),
+      excerpt_am: value(formData, 'excerpt_am', 5000),
+      body_en: value(formData, 'body_en', 50000),
+      body_am: value(formData, 'body_am', 50000),
+      author_name_en: value(formData, 'author_name_en', 160),
+      author_name_am: value(formData, 'author_name_am', 160),
+      image_id: imageID,
+      video_id: videoID,
+      published_at: publishedAt,
+      featured: formData.get('featured') === 'on',
       status,
-    ]
+    }
     if (id) {
-      await database.execute(
-        `UPDATE stories SET slug=?, title_en=?, title_am=?, excerpt_en=?, excerpt_am=?, body_en=?,
-          body_am=?, author_name_en=?, author_name_am=?, image_id=?, video_id=?, published_at=?, featured=?, status=?
-         WHERE id=?`,
-        [...values, id],
-      )
+      await update('stories', values, { id })
     } else {
-      await database.execute(
-        `INSERT INTO stories
-          (slug, title_en, title_am, excerpt_en, excerpt_am, body_en, body_am, author_name_en,
-           author_name_am, image_id, video_id, published_at, featured, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        values,
-      )
+      await insert('stories', values)
     }
   }
 
@@ -384,7 +361,7 @@ export async function restoreContent(formData: FormData) {
   if (!id) throw new Error('Invalid content ID.')
 
   const table = section === 'experience' ? 'experiences' : section === 'story' ? 'stories' : 'social_posts'
-  await database.execute(`UPDATE ${table} SET status = 'draft' WHERE id = ?`, [id])
+  await update(table, { status: 'draft' }, { id })
 
   const listSlug = section === 'experience' ? 'experiences' : section === 'story' ? 'stories' : 'social'
   redirect(`/admin/${listSlug}?restored=1`)
@@ -397,15 +374,16 @@ export async function deleteMedia(formData: FormData) {
   const id = positiveID(value(formData, 'id', 20))
   if (!id) throw new Error('Invalid media ID.')
 
-  const media = await rows<{ filename: string } & RowDataPacket>(
-    'SELECT filename FROM media WHERE id = ? LIMIT 1',
-    [id],
-  )
+  const media = await rows<{ filename: string }>('media', {
+    select: 'filename',
+    eq: { id },
+    limit: 1,
+  })
   const record = media[0]
   if (!record) redirect('/admin/media?deleted=1')
 
-  await database.execute('DELETE FROM media WHERE id = ?', [id])
-  await unlink(path.join(process.cwd(), 'public', 'uploads', 'media', record.filename)).catch(() => undefined)
+  await remove('media', { id })
+  await removeStorageFile(PUBLIC_MEDIA_BUCKET, record.filename).catch(() => undefined)
   redirect('/admin/media?deleted=1')
 }
 
@@ -417,7 +395,7 @@ export async function deleteAdmin(formData: FormData) {
   if (!id) throw new Error('Invalid admin ID.')
   if (id === admin.id) throw new Error('You cannot delete your own account.')
 
-  await database.execute('DELETE FROM admins WHERE id = ?', [id])
+  await remove('admins', { id })
   redirect('/admin/admins?deleted=1')
 }
 
@@ -461,19 +439,20 @@ export async function uploadMedia(formData: FormData) {
   }
 
   const filename = `${randomUUID()}.${extension}`
-  const directory = path.join(process.cwd(), 'public', 'uploads', 'media')
-  await mkdir(directory, { recursive: true })
-  const filePath = path.join(directory, filename)
-  await writeFile(filePath, buffer, { flag: 'wx' })
+  await uploadStorageFile(PUBLIC_MEDIA_BUCKET, filename, buffer, file.type)
 
   try {
-    await database.execute(
-      `INSERT INTO media (filename, original_filename, mime_type, size_bytes, width, height, alt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [filename, file.name.replace(/[/\\\0]/g, '').slice(0, 255), file.type, file.size, width, height, alt],
-    )
+    await insert('media', {
+      filename,
+      original_filename: file.name.replace(/[/\\\0]/g, '').slice(0, 255),
+      mime_type: file.type,
+      size_bytes: file.size,
+      width,
+      height,
+      alt,
+    })
   } catch (error) {
-    await unlink(filePath).catch(() => undefined)
+    await removeStorageFile(PUBLIC_MEDIA_BUCKET, filename).catch(() => undefined)
     throw error
   }
 
@@ -501,29 +480,14 @@ export async function updateRegistration(formData: FormData) {
   }
   const internalNotes = value(formData, 'internal_notes', 5000)
 
-  const connection = await database.getConnection()
-  let registration: RegistrationMailRow | undefined
-  try {
-    await connection.beginTransaction()
-    const [existingRows] = await connection.execute<RegistrationMailRow[]>(
-      `SELECT id, email, full_name, check_in_token, payment_status, ticket_email_sent_at
-       FROM registrations WHERE id = ? FOR UPDATE`,
-      [id],
-    )
-    registration = existingRows[0]
-    if (!registration) throw new Error('Registration not found.')
-
-    await connection.execute(
-      'UPDATE registrations SET payment_status = ?, internal_notes = ? WHERE id = ?',
-      [status, internalNotes, id],
-    )
-    await connection.commit()
-  } catch (error) {
-    await connection.rollback()
-    throw error
-  } finally {
-    connection.release()
-  }
+  const existingRows = await rows<RegistrationMailRow>('registrations', {
+    select: 'id, email, full_name, check_in_token, payment_status, ticket_email_sent_at',
+    eq: { id },
+    limit: 1,
+  })
+  const registration = existingRows[0]
+  if (!registration) throw new Error('Registration not found.')
+  await update('registrations', { payment_status: status, internal_notes: internalNotes }, { id })
 
   let emailFailed = false
   if (status === 'verified' && registration && !registration.ticket_email_sent_at) {
@@ -547,10 +511,7 @@ export async function updateRegistration(formData: FormData) {
           }),
         })
         if (response.ok) {
-          await database.execute(
-            'UPDATE registrations SET ticket_email_sent_at = NOW() WHERE id = ? AND ticket_email_sent_at IS NULL',
-            [id],
-          )
+          await update('registrations', { ticket_email_sent_at: new Date().toISOString() }, { id, ticket_email_sent_at: null })
         } else {
           emailFailed = true
         }
@@ -585,6 +546,20 @@ export async function createAdmin(formData: FormData) {
   })
   redirect('/admin/admins?saved=1')
 }
+
+export async function saveSocialLinks(formData: FormData) {
+  const admin = await getAdminSession()
+  if (!admin || admin.role !== 'super-admin') redirect('/admin')
+
+  const platforms = ['telegram', 'whatsapp', 'linkedin', 'tiktok', 'instagram', 'youtube', 'x', 'snapchat']
+  await Promise.all(platforms.map((platform) => update('social_links', {
+    url: value(formData, `url_${platform}`, 1000),
+    visible: formData.get(`visible_${platform}`) === 'on',
+    updated_at: new Date().toISOString(),
+  }, { platform })))
+  redirect('/admin/social-links?saved=1')
+}
+
 export async function saveAnnouncement(formData: FormData) {
   const admin = await getAdminSession()
   if (!admin || admin.role !== 'super-admin') redirect('/admin/login')
@@ -600,18 +575,18 @@ export async function saveAnnouncement(formData: FormData) {
   const status = statusValue === 'published' ? 'published' : statusValue === 'archived' ? 'archived' : 'draft'
   const dismissible = formData.get('dismissible') === 'on' ? 1 : 0
 
-  const linkValues = [linkURLRaw || null, value(formData, 'link_label', 120) || null, status, dismissible, title, message]
+  const announcement = {
+    link_url: linkURLRaw || null,
+    link_label: value(formData, 'link_label', 120) || null,
+    status,
+    dismissible: Boolean(dismissible),
+    title,
+    message,
+  }
   if (id) {
-    await database.execute(
-      'UPDATE announcements SET link_url=?, link_label=?, status=?, dismissible=?, title=?, message=? WHERE id=?',
-      [...linkValues, id],
-    )
+    await update('announcements', announcement, { id })
   } else {
-    await database.execute(
-      `INSERT INTO announcements (share_token, link_url, link_label, status, dismissible, title, message)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [randomUUID(), ...linkValues],
-    )
+    await insert('announcements', { share_token: randomUUID(), ...announcement })
   }
   redirect('/admin/announcements?saved=1')
 }
@@ -622,6 +597,6 @@ export async function deleteAnnouncement(formData: FormData) {
 
   const id = positiveID(value(formData, 'id', 20))
   if (!id) throw new Error('Invalid announcement ID.')
-  await database.execute('DELETE FROM announcements WHERE id = ?', [id])
+  await remove('announcements', { id })
   redirect('/admin/announcements?deleted=1')
 }

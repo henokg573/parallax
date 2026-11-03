@@ -1,9 +1,8 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
-import { mkdir, unlink, writeFile } from 'node:fs/promises'
-import path from 'node:path'
-import { database } from '@/lib/db'
+import { insert, rows } from '@/lib/db'
+import { PRIVATE_RECEIPTS_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
 
 export type RegistrationState = {
   success: boolean
@@ -89,7 +88,7 @@ export async function registerForExperience(
     }
   }
 
-  let receiptPath: string | undefined
+  let receiptStoragePath: string | undefined
   try {
     if (!receiptFile) throw new Error('Receipt validation failed.')
 
@@ -113,62 +112,49 @@ export async function registerForExperience(
     }
 
     const storageName = `${randomUUID()}.${extension}`
-    const receiptDirectory = path.join(process.cwd(), 'var', 'uploads', 'payment-receipts')
-    await mkdir(receiptDirectory, { recursive: true })
-    receiptPath = path.join(receiptDirectory, storageName)
-    await writeFile(receiptPath, receiptBytes, { flag: 'wx' })
+    receiptStoragePath = await uploadStorageFile(PRIVATE_RECEIPTS_BUCKET, storageName, receiptBytes, receiptFile.type)
 
-    const connection = await database.getConnection()
-    try {
-      await connection.beginTransaction()
-      const [experienceRows] = await connection.execute(
-        `SELECT id, capacity FROM experiences
-         WHERE id = ? AND status = 'published' LIMIT 1 FOR UPDATE`,
-        [experience],
-      )
-      const selectedExperience = (
-        experienceRows as Array<{ id: number; capacity: number | null }>
-      )[0]
-      if (!selectedExperience) throw new Error('Experience is not open for registration.')
+    const experienceRows = await rows<{ id: number; capacity: number | null }>('experiences', {
+      select: 'id, capacity',
+      eq: { id: experience, status: 'published' },
+      limit: 1,
+    })
+    const selectedExperience = experienceRows[0]
+    if (!selectedExperience) throw new Error('Experience is not open for registration.')
 
-      if (selectedExperience.capacity) {
-        const [countRows] = await connection.execute(
-          `SELECT COUNT(*) AS total FROM registrations
-           WHERE experience_id = ? AND payment_status != 'rejected'`,
-          [experience],
-        )
-        const registrationCount = Number((countRows as Array<{ total: number }>)[0]?.total || 0)
-        if (registrationCount >= selectedExperience.capacity) {
-          throw new Error('Experience capacity has been reached.')
-        }
+    if (selectedExperience.capacity) {
+      const registrations = await rows<{ id: number }>('registrations', {
+        select: 'id',
+        eq: { experience_id: experience },
+        neq: { payment_status: 'rejected' },
+      })
+      if (registrations.length >= selectedExperience.capacity) {
+        throw new Error('Experience capacity has been reached.')
       }
-
-      const [receiptResult] = await connection.execute(
-        `INSERT INTO payment_receipts (filename, original_filename, mime_type, size_bytes)
-         VALUES (?, ?, ?, ?)`,
-        [storageName, receiptFile.name.replace(/[/\\\0]/g, '').slice(0, 255), receiptFile.type, receiptFile.size],
-      )
-      const receiptID = (receiptResult as { insertId: number }).insertId
-      await connection.execute(
-        `INSERT INTO registrations
-          (experience_id, receipt_id, full_name, email, phone, payment_reference, check_in_token)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [experience, receiptID, fullName, email, phone, paymentReference, randomUUID()],
-      )
-      await connection.commit()
-    } catch (error) {
-      await connection.rollback()
-      throw error
-    } finally {
-      connection.release()
     }
+
+    const receipt = await insert<{ id: number }>('payment_receipts', {
+      filename: storageName,
+      original_filename: receiptFile.name.replace(/[/\\\0]/g, '').slice(0, 255),
+      mime_type: receiptFile.type,
+      size_bytes: receiptFile.size,
+    })
+    await insert('registrations', {
+      experience_id: experience,
+      receipt_id: receipt.id,
+      full_name: fullName,
+      email,
+      phone,
+      payment_reference: paymentReference,
+      check_in_token: randomUUID(),
+    })
 
     return {
       success: true,
       message: copy.success,
     }
   } catch {
-    if (receiptPath) await unlink(receiptPath).catch(() => undefined)
+    if (receiptStoragePath) await removeStorageFile(PRIVATE_RECEIPTS_BUCKET, receiptStoragePath).catch(() => undefined)
     return {
       success: false,
       message: copy.failure,
