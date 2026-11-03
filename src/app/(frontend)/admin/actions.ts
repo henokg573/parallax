@@ -552,11 +552,18 @@ export async function saveSocialLinks(formData: FormData) {
   if (!admin || admin.role !== 'super-admin') redirect('/admin')
 
   const platforms = ['telegram', 'whatsapp', 'linkedin', 'tiktok', 'instagram', 'youtube', 'x', 'snapchat']
-  await Promise.all(platforms.map((platform) => update('social_links', {
-    url: value(formData, `url_${platform}`, 1000),
-    visible: formData.get(`visible_${platform}`) === 'on',
-    updated_at: new Date().toISOString(),
-  }, { platform })))
+  try {
+    await Promise.all(platforms.map((platform) => update('social_links', {
+      url: value(formData, `url_${platform}`, 1000),
+      visible: formData.get(`visible_${platform}`) === 'on',
+      updated_at: new Date().toISOString(),
+    }, { platform })))
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('social_links')) {
+      redirect('/admin/social-links?error=missing-table')
+    }
+    throw error
+  }
   redirect('/admin/social-links?saved=1')
 }
 

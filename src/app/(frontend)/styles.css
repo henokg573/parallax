@@ -64,6 +64,13 @@ html {
   gap: 12px;
   text-decoration: none;
 }
+.brand-logo {
+  border-radius: 12px;
+  display: block;
+  height: 68px;
+  object-fit: cover;
+  width: 68px;
+}
 .brand-mark {
   align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.35);
@@ -1184,6 +1191,10 @@ footer {
   .brand-mark {
     height: 39px;
     width: 39px;
+  }
+  .brand-logo {
+    height: 58px;
+    width: 58px;
   }
   .brand strong {
     font-size: 15px;
