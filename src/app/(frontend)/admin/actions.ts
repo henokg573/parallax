@@ -14,7 +14,7 @@ import {
   verifyPassword,
   type AdminAccount,
 } from '@/lib/admin-auth'
-import { database, insert, rows, update } from '@/lib/db'
+import { database, insert, remove, rows, update } from '@/lib/db'
 
 function value(formData: FormData, key: string, maxLength: number) {
   const field = formData.get(key)
@@ -61,7 +61,7 @@ function adminCanEditContent(role: string) {
 
 async function archiveContentRow(section: 'experience' | 'story' | 'social', id: number) {
   const table = section === 'experience' ? 'experiences' : section === 'story' ? 'stories' : 'social_posts'
-  await database.execute(`UPDATE ${table} SET status = 'archived' WHERE id = ?`, [id])
+  await update(table, { status: 'archived' }, { id })
 }
 
 async function saveContentImage(formData: FormData, section: 'experience' | 'story' | 'social', currentID: number | null) {
@@ -355,7 +355,7 @@ export async function deleteContent(formData: FormData) {
   }
 
   const table = section === 'experience' ? 'experiences' : section === 'story' ? 'stories' : 'social_posts'
-  await database.execute(`DELETE FROM ${table} WHERE id = ?`, [id])
+  await remove(table, { id })
 
   const listSlug = section === 'experience' ? 'experiences' : section === 'story' ? 'stories' : 'social'
   redirect(`/admin/${listSlug}?deleted=1`)
@@ -577,10 +577,12 @@ export async function createAdmin(formData: FormData) {
   if (!['super-admin', 'administrator', 'editor', 'check-in'].includes(role)) {
     throw new Error('Choose a valid role.')
   }
-  await database.execute(
-    'INSERT INTO admins (email, display_name, password_hash, role) VALUES (?, ?, ?, ?)',
-    [email, displayName, hashPassword(password), role],
-  )
+  await insert('admins', {
+    email,
+    display_name: displayName,
+    password_hash: hashPassword(password),
+    role,
+  })
   redirect('/admin/admins?saved=1')
 }
 export async function saveAnnouncement(formData: FormData) {

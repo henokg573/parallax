@@ -96,3 +96,16 @@ export async function insert<T = { id: number }>(table: string, values: Record<s
   if (error) throw new Error(error.message)
   return data as T
 }
+
+export async function remove(table: string, eq: Record<string, unknown>) {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+  let query = supabase.from(table).delete()
+
+  for (const [col, val] of Object.entries(eq)) {
+    query = query.eq(col, val)
+  }
+
+  const { error } = await query
+  if (error) throw new Error(error.message)
+}
