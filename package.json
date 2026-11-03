@@ -1,0 +1,46 @@
+{
+  "name": "parallax-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start",
+    "db:init": "node --env-file-if-exists=.env scripts/init-db.mjs",
+    "db:admin": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-admin.ps1",
+    "format": "oxfmt"
+  },
+  "dependencies": {
+    "html-react-parser": "^5.2.10",
+    "mysql2": "^3.15.3",
+    "next": "16.4.2",
+    "qrcode": "^1.5.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "sharp": "^0.35.4",
+    "@zxing/browser": "^0.1.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "24.12.3",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "oxfmt": "^0.73.0",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=20.9.0",
+    "pnpm": "^9 || ^10 || ^11"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild",
+      "unrs-resolver"
+    ]
+  }
+}
