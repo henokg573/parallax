@@ -14,7 +14,7 @@ import {
   verifyPassword,
   type AdminAccount,
 } from '@/lib/admin-auth'
-import { database, rows } from '@/lib/db'
+import { database, rows, update } from '@/lib/db'
 
 function value(formData: FormData, key: string, maxLength: number) {
   const field = formData.get(key)
@@ -157,11 +157,11 @@ export async function loginAdmin(formData: FormData) {
     ? nextPathValue
     : '/admin'
 
-  const admins = await rows<AdminAccount>(
-    `SELECT id, email, display_name, password_hash, role, failed_login_attempts, locked_until
-     FROM admins WHERE email = ? LIMIT 1`,
-    [email],
-  )
+  const admins = await rows<AdminAccount>('admins', {
+    select: 'id, email, display_name, password_hash, role, failed_login_attempts, locked_until',
+    eq: { email },
+    limit: 1,
+  })
   const admin = admins[0]
   const invalid = () => redirect('/admin/login?error=invalid')
 
@@ -173,23 +173,17 @@ export async function loginAdmin(formData: FormData) {
   if (!verifyPassword(password, admin.password_hash)) {
     const attempts = admin.failed_login_attempts + 1
     if (attempts >= 5) {
-      await database.execute(
-        'UPDATE admins SET failed_login_attempts = 0, locked_until = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?',
-        [admin.id],
-      )
+      await update('admins', {
+        failed_login_attempts: 0,
+        locked_until: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      }, { id: admin.id })
       redirect('/admin/login?error=locked')
     }
-    await database.execute(
-      'UPDATE admins SET failed_login_attempts = ? WHERE id = ?',
-      [attempts, admin.id],
-    )
+    await update('admins', { failed_login_attempts: attempts }, { id: admin.id })
     invalid()
   }
 
-  await database.execute(
-    'UPDATE admins SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?',
-    [admin.id],
-  )
+  await update('admins', { failed_login_attempts: 0, locked_until: null }, { id: admin.id })
   await setAdminSession(admin.id)
   redirect(nextPath)
 }

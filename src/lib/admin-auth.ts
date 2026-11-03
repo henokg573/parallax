@@ -100,10 +100,11 @@ export async function getAdminSession(): Promise<SafeAdmin | null> {
   const adminID = parseSessionToken(token)
   if (!adminID) return null
 
-  const admins = await rows<AdminAccount>(
-    'SELECT id, email, display_name, role FROM admins WHERE id = ? LIMIT 1',
-    [adminID],
-  )
+  const admins = await rows<AdminAccount>('admins', {
+    select: 'id, email, display_name, role',
+    eq: { id: adminID },
+    limit: 1,
+  })
   const admin = admins[0]
   if (!admin) return null
 
