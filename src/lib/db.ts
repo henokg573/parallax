@@ -88,3 +88,11 @@ export async function update(
   const { error } = await query
   if (error) throw new Error(error.message)
 }
+
+export async function insert<T = { id: number }>(table: string, values: Record<string, unknown>): Promise<T> {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+  const { data, error } = await supabase.from(table).insert(values).select('id').single()
+  if (error) throw new Error(error.message)
+  return data as T
+}

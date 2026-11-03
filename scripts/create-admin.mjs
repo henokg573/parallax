@@ -1,5 +1,5 @@
 import { scryptSync, randomBytes } from 'node:crypto'
-import mysql from 'mysql2/promise'
+import { createClient } from '@supabase/supabase-js'
 
 const email = process.env.PARALLAX_ADMIN_EMAIL?.trim().toLowerCase()
 const displayName = process.env.PARALLAX_ADMIN_DISPLAY_NAME?.trim()
@@ -15,23 +15,19 @@ if (displayName.length < 2 || displayName.length > 120) {
 if (password.length < 12 || password.length > 200) {
   throw new Error('Password must be between 12 and 200 characters.')
 }
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) {
+  throw new Error('SUPABASE_URL and SUPABASE_SECRET_KEY must be configured.')
+}
 
 const salt = randomBytes(16).toString('hex')
 const digest = scryptSync(password, salt, 64).toString('hex')
-const connection = await mysql.createConnection({
-  host: process.env.MYSQL_HOST || '127.0.0.1',
-  port: Number(process.env.MYSQL_PORT || 3306),
-  user: process.env.MYSQL_USER || 'root',
-  password: process.env.MYSQL_PASSWORD || '',
-  database: process.env.MYSQL_DATABASE || 'parallax',
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY)
+const { error } = await supabase.from('admins').insert({
+  email,
+  display_name: displayName,
+  password_hash: `scrypt$${salt}$${digest}`,
+  role: 'super-admin',
 })
 
-try {
-  await connection.execute(
-    'INSERT INTO admins (email, display_name, password_hash, role) VALUES (?, ?, ?, ?)',
-    [email, displayName, `scrypt$${salt}$${digest}`, 'super-admin'],
-  )
-  console.log(`Created super-admin ${email}.`)
-} finally {
-  await connection.end()
-}
+if (error) throw new Error(error.message)
+console.log(`Created super-admin ${email} in Supabase.`)

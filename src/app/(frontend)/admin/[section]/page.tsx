@@ -120,6 +120,64 @@ const sections = {
   },
 } as const
 
+type SectionName = keyof typeof sections
+
+async function getSectionRecords(sectionName: SectionName): Promise<AdminRecord[]> {
+  if (sectionName === 'media') {
+    return rows<AdminRecord>('media', { select: '*', order: { column: 'created_at', ascending: false }, limit: 300 })
+  }
+
+  if (sectionName === 'admins') {
+    return rows<AdminRecord>('admins', {
+      select: 'id, email, display_name, role, created_at',
+      order: { column: 'email' },
+    })
+  }
+
+  if (sectionName === 'registrations') {
+    const [registrations, experiences, receipts] = await Promise.all([
+      rows<AdminRecord>('registrations', { select: '*', order: { column: 'created_at', ascending: false }, limit: 300 }),
+      rows<{ id: number; title_en: string }>('experiences', { select: 'id, title_en' }),
+      rows<{ id: number; original_filename: string }>('payment_receipts', { select: 'id, original_filename' }),
+    ])
+    const experienceTitles = new Map(experiences.map((item) => [item.id, item.title_en]))
+    const receiptNames = new Map(receipts.map((item) => [item.id, item.original_filename]))
+    return registrations.map((record) => ({
+      ...record,
+      experience_title: experienceTitles.get(Number(record.experience_id)) || 'Parallax experience',
+      receipt_name: receiptNames.get(Number(record.receipt_id)) || 'Receipt',
+    }))
+  }
+
+  const table = sectionName === 'experiences' ? 'experiences' : sectionName === 'stories' ? 'stories' : 'social_posts'
+  const records = await rows<AdminRecord>(table, {
+    select: '*',
+    order: { column: sectionName === 'experiences' ? 'start_date' : sectionName === 'stories' ? 'published_at' : 'posted_at', ascending: false },
+    limit: 200,
+  })
+  const mediaIDs = records.flatMap((record) => [
+    record.image_id,
+    record.video_id,
+    record.thumbnail_id,
+  ]).filter((id): id is number => typeof id === 'number')
+  const media = mediaIDs.length
+    ? await rows<AdminRecord>('media', { select: 'id, filename, alt', in: { id: mediaIDs } })
+    : []
+  const mediaByID = new Map(media.map((item) => [Number(item.id), item]))
+
+  return records.map((record) => {
+    const image = mediaByID.get(Number(sectionName === 'social' ? record.thumbnail_id : record.image_id))
+    const video = mediaByID.get(Number(record.video_id))
+    return {
+      ...record,
+      image_filename: image?.filename || null,
+      image_alt: image?.alt || null,
+      video_filename: video?.filename || null,
+      video_alt: video?.alt || null,
+    }
+  })
+}
+
 const inputClass = 'mt-1.5 w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15'
 const primaryButton = 'rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/40'
 const ghostButton = 'rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:border-zinc-400 hover:bg-zinc-50'
@@ -282,7 +340,7 @@ export default async function AdminSectionPage({
   if (admin.role === 'check-in' && sectionName !== 'registrations') redirect('/admin/registrations')
   if (sectionName === 'admins' && admin.role !== 'super-admin') redirect('/admin')
 
-  const records = await rows<AdminRecord>(section.query)
+  const records = await getSectionRecords(sectionName as SectionName)
   if (sectionName === 'registrations') {
     await Promise.all(records.map(async (record) => {
       record.ticket_qr = record.payment_status === 'verified'
