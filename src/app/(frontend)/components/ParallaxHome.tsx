@@ -86,6 +86,58 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   )
 }
 
+type SocialPlatform = 'telegram' | 'whatsapp' | 'linkedin' | 'tiktok' | 'instagram' | 'youtube' | 'x' | 'snapchat'
+
+function SocialIcon({ platform, size = 17 }: { platform: SocialPlatform; size?: number }) {
+  const paths: Record<SocialPlatform, ReactNode> = {
+    telegram: <path d="m21 4-3 16-6-5-3 2 1-5L4 9l17-5Zm-9 10 6-7-8 5 2 2Z" />,
+    whatsapp: (
+      <>
+        <path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4A8 8 0 1 1 20 11.5Z" />
+        <path d="M9 8.5c.2-.4.4-.4.7-.4h.5c.2 0 .4.1.5.4l.7 1.7c.1.2.1.4-.1.6l-.5.6c.6 1.1 1.5 1.8 2.7 2.3l.5-.6c.2-.2.4-.2.6-.1l1.7.8c.2.1.3.3.2.5-.2 1-.8 1.4-1.6 1.4-2.6-.1-5.8-2.8-6.3-5.4-.2-.7.1-1.4.4-1.8Z" />
+      </>
+    ),
+    linkedin: (
+      <>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M8 10v6M8 7.5v.1M12 16v-3.2a2.8 2.8 0 0 1 5.6 0V16M12 10v6" />
+      </>
+    ),
+    tiktok: <path d="M14 4v10.2a3.7 3.7 0 1 1-3-3.6M14 4c.5 2.1 1.8 3.5 4 4" />,
+    instagram: (
+      <>
+        <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="17.5" cy="6.7" r=".7" fill="currentColor" stroke="none" />
+      </>
+    ),
+    youtube: (
+      <>
+        <path d="M21 12s0-3.5-.4-4.8a2.5 2.5 0 0 0-1.8-1.8C17.5 5 12 5 12 5s-5.5 0-6.8.4a2.5 2.5 0 0 0-1.8 1.8C3 8.5 3 12 3 12s0 3.5.4 4.8a2.5 2.5 0 0 0 1.8 1.8c1.3.4 6.8.4 6.8.4s5.5 0 6.8-.4a2.5 2.5 0 0 0 1.8-1.8C21 15.5 21 12 21 12Z" />
+        <path d="m10 9 5 3-5 3Z" />
+      </>
+    ),
+    x: <path d="m5 5 14 14M19 5 5 19" />,
+    snapchat: <path d="M12 4.5a4 4 0 0 0-4 4v2.2c0 .7-.5 1.3-1.2 1.5l-1.3.4c-.4.1-.4.7 0 .8l1.7.4c.3.1.5.3.6.6.2.6.8 1 1.5 1.1.4.1.7.4.9.7.4.7 1 1.3 1.8 1.6.8-.3 1.4-.9 1.8-1.6.2-.3.5-.6.9-.7.7-.1 1.3-.5 1.5-1.1.1-.3.3-.5.6-.6l1.7-.4c.4-.1.4-.7 0-.8l-1.3-.4a1.6 1.6 0 0 1-1.2-1.5V8.5a4 4 0 0 0-4-4Z" />,
+  }
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {paths[platform]}
+    </svg>
+  )
+}
+
 const copy = {
   en: {
     tagline: 'FAITH · ADVENTURE · COMMUNITY',
@@ -375,6 +427,14 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
           </span>
           <span>
             <strong>PARALLAX</strong>
+        <div className="mobile-top-language" aria-label="Language">
+          <button type="button" onClick={() => selectLanguage('en')} aria-pressed={language === 'en'}>
+            EN
+          </button>
+          <button type="button" onClick={() => selectLanguage('am')} aria-pressed={language === 'am'}>
+            አማ
+          </button>
+        </div>
             <small>{t.tagline}</small>
           </span>
         </a>
@@ -423,14 +483,6 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
             <Icon name="users" size={18} />
             <span>{language === 'am' ? 'ማህበራዊ' : 'Social'}</span>
           </a>
-          <div className="mobile-language" aria-label="Language">
-            <button type="button" onClick={() => selectLanguage('en')} aria-pressed={language === 'en'}>
-              EN
-            </button>
-            <button type="button" onClick={() => selectLanguage('am')} aria-pressed={language === 'am'}>
-              አማ
-            </button>
-          </div>
         </nav>
       </header>
 
@@ -876,9 +928,11 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
             <a href="#social">{t.navSocial}</a>
           </nav>
           <div className="socials">
-            <a href="#social">IG</a>
-            <a href="#social">TG</a>
-            <a href="#social">YT</a>
+            {(['telegram', 'whatsapp', 'linkedin', 'tiktok', 'instagram', 'youtube', 'x', 'snapchat'] as const).map((platform) => (
+              <a aria-label={platform} href="#social" key={platform}>
+                <SocialIcon platform={platform} />
+              </a>
+            ))}
           </div>
         </div>
         <div className="footer-bottom">
