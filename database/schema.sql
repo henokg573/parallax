@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS experiences (
   slug VARCHAR(190) NOT NULL,
   title_en VARCHAR(200) NOT NULL,
   title_am VARCHAR(200) NOT NULL DEFAULT '',
-  kind ENUM('trip', 'event', 'faith') NOT NULL DEFAULT 'trip',
+  kind ENUM('trip', 'event', 'faith', 'workshop', 'other') NOT NULL DEFAULT 'trip',
   summary_en TEXT NOT NULL,
   summary_am TEXT NOT NULL,
   location_en VARCHAR(200) NOT NULL,
@@ -76,6 +76,9 @@ CREATE TABLE IF NOT EXISTS experiences (
   price DECIMAL(10,2) NULL,
   currency CHAR(3) NOT NULL DEFAULT 'ETB',
   registration_url VARCHAR(1000) NULL,
+  image_url VARCHAR(1000) NULL,
+  resource_url VARCHAR(1000) NULL,
+  resource_id BIGINT UNSIGNED NULL,
   image_id BIGINT UNSIGNED NULL,
   video_id BIGINT UNSIGNED NULL,
   featured TINYINT(1) NOT NULL DEFAULT 0,
@@ -86,8 +89,10 @@ CREATE TABLE IF NOT EXISTS experiences (
   UNIQUE KEY experiences_slug_unique (slug),
   KEY experiences_status_start_idx (status, start_date),
   KEY experiences_image_idx (image_id),
+  KEY experiences_resource_idx (resource_id),
   KEY experiences_video_idx (video_id),
   CONSTRAINT experiences_image_fk FOREIGN KEY (image_id) REFERENCES media (id) ON DELETE SET NULL,
+  CONSTRAINT experiences_resource_fk FOREIGN KEY (resource_id) REFERENCES media (id) ON DELETE SET NULL,
   CONSTRAINT experiences_video_fk FOREIGN KEY (video_id) REFERENCES media (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -157,6 +162,7 @@ CREATE TABLE IF NOT EXISTS registrations (
   full_name VARCHAR(120) NOT NULL,
   email VARCHAR(180) NOT NULL,
   phone VARCHAR(40) NOT NULL,
+  preferred_channel ENUM('email', 'phone', 'whatsapp', 'telegram') NOT NULL DEFAULT 'email',
   payment_reference VARCHAR(120) NOT NULL,
   payment_status ENUM('pending', 'verified', 'rejected') NOT NULL DEFAULT 'pending',
   check_in_token CHAR(36) NOT NULL,

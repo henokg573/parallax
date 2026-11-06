@@ -15,7 +15,7 @@ html {
   --line: rgba(16, 46, 38, 0.16);
 }
 .frontend-root {
-  font-size: 1.25rem;
+  font-size: 1.875rem;
 }
 * {
   scroll-behavior: smooth;
@@ -41,6 +41,80 @@ html {
 }
 .site-shell {
   overflow: hidden;
+}
+.registration-page {
+  background: var(--paper);
+  min-height: 100vh;
+  padding: 48px 24px 80px;
+}
+.registration-back {
+  color: var(--ink);
+  display: block;
+  margin: 0 auto 32px;
+  max-width: 640px;
+  text-decoration: none;
+}
+.registration-page-card {
+  background: #fff;
+  box-shadow: 0 18px 60px rgba(16, 46, 38, 0.1);
+  margin: 0 auto;
+  max-width: 640px;
+  padding: 48px;
+}
+.registration-page-card h1 {
+  font-size: clamp(36px, 6vw, 58px);
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  margin: 16px 0;
+}
+.section-label {
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  margin: 0;
+}
+.registration-page-summary {
+  color: #5d6d66;
+  line-height: 1.7;
+  margin: 0;
+}
+.registration-page-details {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 20px 0 32px;
+}
+.next-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.next-card-actions a {
+  align-items: center;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 600;
+  gap: 7px;
+  margin-top: 0;
+  text-decoration: none;
+}
+.next-card-actions a:first-child {
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  flex: 1 1 100%;
+  justify-content: space-between;
+  padding-top: 14px;
+}
+.next-card-register {
+  align-items: center;
+  background: var(--gold);
+  color: var(--ink) !important;
+  display: inline-flex;
+  gap: 7px;
+  padding: 9px 12px;
 }
 .topbar {
   align-items: center;
@@ -442,6 +516,13 @@ h2 em {
   font-weight: 700;
   justify-content: space-between;
   letter-spacing: 0.15em;
+}
+.next-card-image {
+  display: block;
+  height: 150px;
+  margin: 20px -24px 0;
+  object-fit: cover;
+  width: calc(100% + 48px);
 }
 .spots {
   align-items: center;
@@ -1447,6 +1528,15 @@ footer {
   text-transform: uppercase;
 }
 .registration-form input {
+  background: #fff;
+  border: 1px solid rgba(16, 46, 38, 0.22);
+  font-size: 12px;
+  height: 42px;
+  outline: none;
+  padding: 0 11px;
+  width: 100%;
+}
+.registration-form select {
   background: #fff;
   border: 1px solid rgba(16, 46, 38, 0.22);
   font-size: 12px;

@@ -63,11 +63,11 @@ async function archiveContentRow(section: 'experience' | 'story' | 'social', id:
   await update(table, { status: 'archived' }, { id })
 }
 
-async function saveContentImage(formData: FormData, section: 'experience' | 'story' | 'social', currentID: number | null) {
+async function saveContentImage(formData: FormData, section: 'experience' | 'story' | 'social', currentID: number | null, allowEmpty = false) {
   const fileKey = section === 'social' ? 'thumbnail_file' : 'image_file'
   const file = formData.get(fileKey)
   if (!(file instanceof File) || file.size === 0) {
-    if (section !== 'social' && !currentID) throw new Error('Choose an image file.')
+    if (section !== 'social' && !currentID && !allowEmpty) throw new Error('Choose an image file.')
     return currentID
   }
 
@@ -149,6 +149,39 @@ async function saveContentVideo(formData: FormData, currentID: number | null) {
   }
 }
 
+async function saveContentResource(formData: FormData, currentID: number | null) {
+  const file = formData.get('resource_file')
+  if (!(file instanceof File) || file.size === 0) return currentID
+  if (file.size > 20 * 1024 * 1024) throw new Error('Resource files must be 20 MB or smaller.')
+
+  const extensionByMime: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-powerpoint': 'ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+    'text/plain': 'txt',
+  }
+  const extension = extensionByMime[file.type]
+  if (!extension) throw new Error('Upload a PDF, Word, PowerPoint, or text file.')
+
+  const filename = `${randomUUID()}.${extension}`
+  await uploadStorageFile(PUBLIC_MEDIA_BUCKET, filename, Buffer.from(await file.arrayBuffer()), file.type)
+  try {
+    const result = await insert<{ id: number }>('media', {
+      filename,
+      original_filename: file.name.replace(/[/\\\0]/g, '').slice(0, 255),
+      mime_type: file.type,
+      size_bytes: file.size,
+      alt: value(formData, 'resource_label', 255) || file.name,
+    })
+    return result.id
+  } catch (error) {
+    await removeStorageFile(PUBLIC_MEDIA_BUCKET, filename).catch(() => undefined)
+    throw error
+  }
+}
+
 export async function loginAdmin(formData: FormData) {
   const email = value(formData, 'email', 190).toLowerCase()
   const password = String(formData.get('password') || '')
@@ -215,8 +248,16 @@ export async function saveContent(formData: FormData) {
     const currency = value(formData, 'currency', 3).toUpperCase()
     const priceValue = value(formData, 'price', 30)
     const capacityValue = value(formData, 'capacity', 20)
-    if (!title || !summary || !location || !['trip', 'event', 'faith'].includes(kind)) {
+    const imageURL = value(formData, 'image_url', 1000)
+    const resourceURL = value(formData, 'resource_url', 1000)
+    const imageFile = formData.get('image_file')
+    if (!title || !summary || !location || !['trip', 'event', 'faith', 'workshop', 'other'].includes(kind)) {
       throw new Error('Complete the required experience fields.')
+    }
+    if (imageURL && !/^https?:\/\//i.test(imageURL)) throw new Error('Enter a valid image URL.')
+    if (resourceURL && !/^https?:\/\//i.test(resourceURL)) throw new Error('Enter a valid resource URL.')
+    if (!currentImageID && !(imageFile instanceof File && imageFile.size > 0) && !imageURL) {
+      throw new Error('Upload an image or add an image URL.')
     }
     if (!['ETB', 'USD'].includes(currency)) throw new Error('Choose a valid currency.')
     const price = priceValue ? Number(priceValue) : null
@@ -225,8 +266,9 @@ export async function saveContent(formData: FormData) {
     if (capacity !== null && (!Number.isSafeInteger(capacity) || capacity < 1)) {
       throw new Error('Capacity must be a positive whole number.')
     }
-    const imageID = await saveContentImage(formData, section, currentImageID)
+    const imageID = await saveContentImage(formData, section, currentImageID, Boolean(imageURL))
     const videoID = await saveContentVideo(formData, currentVideoID)
+    const resourceID = await saveContentResource(formData, optionalID(value(formData, 'resource_id', 20)))
     const values = {
       slug: slugify(value(formData, 'slug', 190) || title),
       title_en: title,
@@ -242,15 +284,32 @@ export async function saveContent(formData: FormData) {
       price,
       currency,
       registration_url: value(formData, 'registration_url', 1000) || null,
+      image_url: imageURL || null,
+      resource_url: resourceURL || null,
+      resource_id: resourceID,
       image_id: imageID,
       video_id: videoID,
       featured: formData.get('featured') === 'on',
       status,
     }
-    if (id) {
-      await update('experiences', values, { id })
-    } else {
-      await insert('experiences', values)
+    try {
+      if (id) {
+        await update('experiences', values, { id })
+      } else {
+        await insert('experiences', values)
+      }
+    } catch (error) {
+      const message = String(error)
+      const missingRegistrationColumn = message.includes('image_url') || message.includes('resource_url') || message.includes('resource_id')
+      if (!missingRegistrationColumn) throw error
+      if (imageURL || resourceURL || resourceID) redirect('/admin/registrations?error=schema')
+
+      const { image_url: unusedImageURL, resource_url: unusedResourceURL, resource_id: unusedResourceID, ...legacyValues } = values
+      if (id) {
+        await update('experiences', legacyValues, { id })
+      } else {
+        await insert('experiences', legacyValues)
+      }
     }
   }
 

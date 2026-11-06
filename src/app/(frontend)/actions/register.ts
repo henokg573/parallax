@@ -1,7 +1,7 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
-import { insert, rows } from '@/lib/db'
+import { publicRpc } from '@/lib/db'
 import { PRIVATE_RECEIPTS_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
 
 export type RegistrationState = {
@@ -9,13 +9,6 @@ export type RegistrationState = {
   message: string
   errors?: Record<string, string>
 }
-
-const initialState: RegistrationState = {
-  success: false,
-  message: '',
-}
-
-export { initialState }
 
 function text(formData: FormData, name: string, max: number): string {
   const value = formData.get(name)
@@ -55,6 +48,7 @@ export async function registerForExperience(
   const fullName = text(formData, 'fullName', 120)
   const email = text(formData, 'email', 180).toLowerCase()
   const phone = text(formData, 'phone', 40)
+  const preferredChannel = text(formData, 'preferredChannel', 20)
   const paymentReference = text(formData, 'paymentReference', 120)
   const locale = text(formData, 'locale', 2) === 'am' ? 'am' : 'en'
   const copy = messages[locale]
@@ -68,6 +62,9 @@ export async function registerForExperience(
     errors.email = copy.email
   }
   if (phone.length < 7) errors.phone = copy.phone
+  if (!['email', 'phone', 'whatsapp', 'telegram'].includes(preferredChannel)) {
+    errors.preferredChannel = 'Choose a preferred communication channel.'
+  }
   if (paymentReference.length < 3) {
     errors.paymentReference = copy.paymentReference
   }
@@ -112,49 +109,38 @@ export async function registerForExperience(
     }
 
     const storageName = `${randomUUID()}.${extension}`
-    receiptStoragePath = await uploadStorageFile(PRIVATE_RECEIPTS_BUCKET, storageName, receiptBytes, receiptFile.type)
+    receiptStoragePath = await uploadStorageFile(
+      PRIVATE_RECEIPTS_BUCKET,
+      storageName,
+      receiptBytes,
+      receiptFile.type,
+      true,
+    )
 
-    const experienceRows = await rows<{ id: number; capacity: number | null }>('experiences', {
-      select: 'id, capacity',
-      eq: { id: experience, status: 'published' },
-      limit: 1,
-    })
-    const selectedExperience = experienceRows[0]
-    if (!selectedExperience) throw new Error('Experience is not open for registration.')
-
-    if (selectedExperience.capacity) {
-      const registrations = await rows<{ id: number }>('registrations', {
-        select: 'id',
-        eq: { experience_id: experience },
-        neq: { payment_status: 'rejected' },
-      })
-      if (registrations.length >= selectedExperience.capacity) {
-        throw new Error('Experience capacity has been reached.')
-      }
-    }
-
-    const receipt = await insert<{ id: number }>('payment_receipts', {
-      filename: storageName,
-      original_filename: receiptFile.name.replace(/[/\\\0]/g, '').slice(0, 255),
-      mime_type: receiptFile.type,
-      size_bytes: receiptFile.size,
-    })
-    await insert('registrations', {
-      experience_id: experience,
-      receipt_id: receipt.id,
-      full_name: fullName,
-      email,
-      phone,
-      payment_reference: paymentReference,
-      check_in_token: randomUUID(),
+    await publicRpc('create_public_registration', {
+      p_experience_id: experience,
+      p_filename: storageName,
+      p_original_filename: receiptFile.name.replace(/[/\\\0]/g, '').slice(0, 255),
+      p_mime_type: receiptFile.type,
+      p_size_bytes: receiptFile.size,
+      p_full_name: fullName,
+      p_email: email,
+      p_phone: phone,
+      p_preferred_channel: preferredChannel,
+      p_payment_reference: paymentReference,
+      p_check_in_token: randomUUID(),
     })
 
     return {
       success: true,
       message: copy.success,
     }
-  } catch {
+  } catch (error) {
     if (receiptStoragePath) await removeStorageFile(PRIVATE_RECEIPTS_BUCKET, receiptStoragePath).catch(() => undefined)
+    console.error(
+      '[registration] submission failed',
+      error instanceof Error ? error.message : error,
+    )
     return {
       success: false,
       message: copy.failure,

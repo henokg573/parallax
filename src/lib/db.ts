@@ -4,7 +4,7 @@
 // Exposes `rows()` so existing call sites keep working,
 // but backed by Supabase (PostgreSQL).
 
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createPublicClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
 
 export const database = null // kept only so old imports don't break
@@ -16,7 +16,8 @@ export const database = null // kept only so old imports don't break
  * Because the SQL string API is completely different, you must update
  * every call site anyway. Below is the helper you should migrate to.
  */
-export async function rows<T = any>(
+async function rowsWithClient<T = any>(
+  supabase: ReturnType<typeof createClient>,
   table: string,
   options?: {
     select?: string
@@ -29,9 +30,6 @@ export async function rows<T = any>(
     limit?: number
   }
 ): Promise<T[]> {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
-
   let query = supabase.from(table).select(options?.select ?? '*')
 
   if (options?.eq) {
@@ -79,6 +77,20 @@ export async function rows<T = any>(
   return (data ?? []) as T[]
 }
 
+export async function rows<T = any>(
+  table: string,
+  options?: Parameters<typeof rowsWithClient>[2],
+): Promise<T[]> {
+  return rowsWithClient<T>(createClient(await cookies()), table, options)
+}
+
+export async function publicRows<T = any>(
+  table: string,
+  options?: Parameters<typeof rowsWithClient>[2],
+): Promise<T[]> {
+  return rowsWithClient<T>(createPublicClient(await cookies()), table, options)
+}
+
 export async function update(
   table: string,
   values: Record<string, unknown>,
@@ -99,7 +111,31 @@ export async function update(
 export async function insert<T = { id: number }>(table: string, values: Record<string, unknown>): Promise<T> {
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
+  return insertWithClient<T>(supabase, table, values)
+}
+
+async function insertWithClient<T = { id: number }>(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+  values: Record<string, unknown>,
+): Promise<T> {
   const { data, error } = await supabase.from(table).insert(values).select('id').single()
+  if (error) throw new Error(error.message)
+  return data as T
+}
+
+export async function publicInsert<T = { id: number }>(
+  table: string,
+  values: Record<string, unknown>,
+): Promise<T> {
+  return insertWithClient<T>(createPublicClient(await cookies()), table, values)
+}
+
+export async function publicRpc<T = unknown>(
+  functionName: string,
+  args: Record<string, unknown>,
+): Promise<T> {
+  const { data, error } = await createPublicClient(await cookies()).rpc(functionName, args)
   if (error) throw new Error(error.message)
   return data as T
 }

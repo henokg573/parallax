@@ -44,6 +44,36 @@ try {
     }
   }
 
+  const experienceColumns = [
+    ['image_url', 'VARCHAR(1000) NULL'],
+    ['resource_url', 'VARCHAR(1000) NULL'],
+  ]
+  for (const [column, definition] of experienceColumns) {
+    const [existing] = await connection.query(
+      'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+      ['experiences', column],
+    )
+    if (existing.length === 0) {
+      await connection.query(`ALTER TABLE experiences ADD COLUMN \`${column}\` ${definition}`)
+    }
+  }
+
+  const [kindColumn] = await connection.query(
+    'SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+    ['experiences', 'kind'],
+  )
+  if (kindColumn[0] && !String(kindColumn[0].COLUMN_TYPE).includes("'other'")) {
+    await connection.query("ALTER TABLE experiences MODIFY COLUMN kind ENUM('trip', 'event', 'faith', 'workshop', 'other') NOT NULL DEFAULT 'trip'")
+  }
+
+  const [channelColumn] = await connection.query(
+    'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+    ['registrations', 'preferred_channel'],
+  )
+  if (channelColumn.length === 0) {
+    await connection.query("ALTER TABLE registrations ADD COLUMN preferred_channel ENUM('email', 'phone', 'whatsapp', 'telegram') NOT NULL DEFAULT 'email' AFTER phone")
+  }
+
   console.log('MariaDB database and Parallax tables are ready.')
 } finally {
   await connection.end()

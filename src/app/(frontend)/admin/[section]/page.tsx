@@ -32,7 +32,7 @@ const sections = {
       { name: 'title_en', label: 'Title (English)', required: true },
       { name: 'title_am', label: 'Title (Amharic)' },
       { name: 'slug', label: 'URL slug' },
-      { name: 'kind', label: 'Type', type: 'select', options: ['trip', 'event', 'faith'] },
+      { name: 'kind', label: 'Registration type', type: 'select', options: ['event', 'trip', 'faith', 'workshop', 'other'] },
       { name: 'summary_en', label: 'Summary (English)', type: 'textarea', required: true },
       { name: 'summary_am', label: 'Summary (Amharic)', type: 'textarea' },
       { name: 'location_en', label: 'Location (English)', required: true },
@@ -43,6 +43,7 @@ const sections = {
       { name: 'price', label: 'Price', type: 'number' },
       { name: 'currency', label: 'Currency', type: 'select', options: ['ETB', 'USD'] },
       { name: 'registration_url', label: 'External registration URL', type: 'url' },
+      { name: 'resource_url', label: 'Optional information or file URL', type: 'url' },
       { name: 'featured', label: 'Featured', type: 'checkbox' },
       { name: 'status', label: 'Status', type: 'select', options: ['draft', 'published', 'archived'] },
     ] satisfies Field[],
@@ -158,6 +159,7 @@ async function getSectionRecords(sectionName: SectionName): Promise<AdminRecord[
   const mediaIDs = records.flatMap((record) => [
     record.image_id,
     record.video_id,
+    record.resource_id,
     record.thumbnail_id,
   ]).filter((id): id is number => typeof id === 'number')
   const media = mediaIDs.length
@@ -174,6 +176,7 @@ async function getSectionRecords(sectionName: SectionName): Promise<AdminRecord[
       image_alt: image?.alt || null,
       video_filename: video?.filename || null,
       video_alt: video?.alt || null,
+      resource_filename: mediaByID.get(Number(record.resource_id))?.filename || null,
     }
   }) as AdminRecord[]
 }
@@ -272,13 +275,24 @@ function ContentForm({
               name={section === 'social' ? 'thumbnail_file' : 'image_file'}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
-              required={section !== 'social' && !record?.image_id}
+              required={section !== 'social' && !record?.image_id && !record?.image_url}
             />
             <span className="text-xs font-normal text-zinc-500">JPEG, PNG, WebP, or GIF; maximum 10 MB.</span>
           </label>
           <label className="grid gap-1 text-sm font-medium text-zinc-800">
             Image alternative text
             <input className={inputClass} defaultValue={String(record?.image_alt || '')} name="image_alt" maxLength={255} />
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-zinc-800 sm:col-span-2">
+            Or use an image URL
+            <input className={inputClass} defaultValue={String(record?.image_url || '')} name="image_url" type="url" placeholder="https://…" />
+            <span className="text-xs font-normal text-zinc-500">Provide an upload or a public image URL.</span>
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-zinc-800 sm:col-span-2">
+            Information file (optional)
+            <input className="mt-1.5 w-full cursor-pointer rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white" name="resource_file" type="file" accept="application/pdf,.pdf,.doc,.docx,.ppt,.pptx,.txt,text/plain" />
+            <span className="text-xs font-normal text-zinc-500">Optional PDF, Word, PowerPoint, or text file; maximum 20 MB.</span>
+            {record?.resource_filename && <span className="text-xs font-normal text-emerald-700">Current file: {String(record.resource_filename)}</span>}
           </label>
           <label className="grid gap-1 text-sm font-medium text-zinc-800">
             {record?.video_filename ? 'Replace video' : 'Add video (optional)'}
@@ -295,6 +309,7 @@ function ContentForm({
             <input className={inputClass} defaultValue={String(record?.video_alt || '')} name="video_alt" maxLength={255} />
           </label>
         </div>
+        <input name="resource_id" type="hidden" value={record?.resource_id ?? ''} />
         <input name="video_id" type="hidden" value={record?.video_id ?? ''} />
         {record?.video_filename && (
           <div className="grid gap-2">
@@ -330,7 +345,7 @@ export default async function AdminSectionPage({
   searchParams,
 }: {
   params: Promise<{ section: string }>
-  searchParams: Promise<{ saved?: string; deleted?: string; archived?: string; restored?: string; email?: string }>
+  searchParams: Promise<{ saved?: string; deleted?: string; archived?: string; restored?: string; email?: string; new?: string; error?: string }>
 }) {
   const { section: sectionName } = await params
   const section = sections[sectionName as keyof typeof sections]
@@ -382,9 +397,32 @@ export default async function AdminSectionPage({
           Payment was approved, but the ticket email was not sent. The QR below is ready to scan; configure Resend to send tickets by email.
         </p>
       )}
+      {query.error === 'schema' && (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          The registration was not saved because the database migration is missing. Run <span className="font-semibold">database/migrate-registration-workflows.supabase.sql</span> in the Supabase SQL Editor, then try again.
+        </p>
+      )}
 
       {sectionName === 'registrations' ? (
         <div className="grid gap-4">
+          <a className={`${primaryButton} inline-flex w-fit`} href="/admin/registrations?new=1">
+            + Create new registration
+          </a>
+          <Card>
+            <details open={query.new === '1'}>
+              <summary className="flex cursor-pointer items-center justify-between px-5 py-4">
+                <span>
+                  <span className="block text-sm font-bold text-zinc-950">Create a registration opportunity</span>
+                  <span className="mt-0.5 block text-xs font-normal text-zinc-500">Publish an event, trip, faith gathering, workshop, or other registration.</span>
+                </span>
+                <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">New</span>
+              </summary>
+              <ContentForm fields={sections.experiences.fields} section="experience" />
+            </details>
+          </Card>
+          <a className="text-sm font-semibold text-emerald-800 underline underline-offset-4" href="/admin/experiences">
+            Manage existing registration opportunities
+          </a>
           <div className="flex flex-wrap gap-3">
             {(['pending', 'verified', 'rejected'] as const).map((key) => (
               <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm" key={key}>
@@ -404,7 +442,7 @@ export default async function AdminSectionPage({
                       {record.checked_in_at && statusBadge('checked in')}
                     </div>
                     <p className="mt-1 text-sm font-medium text-emerald-800">{record.experience_title}</p>
-                    <p className="mt-1 text-sm text-zinc-600">{record.email} · {record.phone} · Ref <span className="font-mono text-xs">{record.payment_reference}</span></p>
+                    <p className="mt-1 text-sm text-zinc-600">{record.email} · {record.phone} · {String(record.preferred_channel || 'email')} · Ref <span className="font-mono text-xs">{record.payment_reference}</span></p>
                     <p className="mt-1 text-xs text-zinc-500">
                       Submitted {String(record.created_at)} · Ticket {record.ticket_email_sent_at ? 'sent' : 'not sent'} · Check-in {record.checked_in_at || 'not checked in'}
                     </p>
