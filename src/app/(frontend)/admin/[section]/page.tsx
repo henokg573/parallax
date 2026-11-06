@@ -1,4 +1,5 @@
 import QRCode from 'qrcode'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createAdmin, archiveContent, deleteAdmin, deleteContent, deleteMedia, restoreContent, saveContent, updateRegistration, uploadMedia } from '../actions'
 import { requireAdmin } from '@/lib/admin-auth'
@@ -208,6 +209,16 @@ function statusBadge(status: string | number | null) {
   )
 }
 
+async function publicSiteOrigin() {
+  const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL || process.env.FIGMA_PUBLIC_URL
+  if (configuredOrigin) return configuredOrigin.replace(/\/$/, '')
+
+  const requestHeaders = await headers()
+  const host = requestHeaders.get('x-forwarded-host') || requestHeaders.get('host')
+  const protocol = requestHeaders.get('x-forwarded-proto') || 'http'
+  return host ? `${protocol}://${host}` : 'http://localhost:3000'
+}
+
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-2xl border border-zinc-200 bg-white shadow-sm ${className}`}>{children}</section>
 }
@@ -336,6 +347,61 @@ function EmptyState({ label, hint }: { label: string; hint?: string }) {
     <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/60 p-12 text-center">
       <p className="text-base font-semibold text-zinc-700">No {label} yet</p>
       {hint && <p className="mt-1 text-sm text-zinc-500">{hint}</p>}
+    </div>
+  )
+}
+
+async function ExperienceSharePanel({ id }: { id: string }) {
+  let origin = 'http://localhost:3000'
+  try {
+    origin = await publicSiteOrigin()
+  } catch (error) {
+    console.error('[admin] registration share origin failed', error)
+  }
+  const shareURL = `${origin}/register/${encodeURIComponent(id)}`
+  let qrCode: string | null = null
+  try {
+    qrCode = await QRCode.toDataURL(shareURL, { width: 220, margin: 1 })
+  } catch (error) {
+    console.error('[admin] registration QR generation failed', error)
+  }
+
+  return (
+    <div className="mx-4 mb-5 grid gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:mx-5 sm:grid-cols-[auto_1fr] sm:items-center">
+      {qrCode ? (
+        <img
+          className="h-40 w-40 rounded-xl border border-emerald-200 bg-white p-2"
+          src={qrCode}
+          alt={`QR code for registration link ${shareURL}`}
+        />
+      ) : (
+        <div className="flex h-40 w-40 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs text-amber-800">
+          QR code unavailable
+        </div>
+      )}
+      <div className="grid gap-2">
+        <p className="text-sm font-bold text-emerald-950">Share this registration</p>
+        <p className="text-xs text-emerald-800">
+          Share the link or download the QR code. The registration page is available when this experience is published.
+        </p>
+        <a
+          className="break-all text-sm font-semibold text-emerald-800 underline"
+          href={shareURL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {shareURL}
+        </a>
+        {qrCode && (
+          <a
+            className="w-fit rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800"
+            href={qrCode}
+            download={`parallax-registration-${id}.png`}
+          >
+            Download QR code
+          </a>
+        )}
+      </div>
     </div>
   )
 }
@@ -601,6 +667,9 @@ export default async function AdminSectionPage({
                     <span className="text-zinc-400">▾</span>
                   </summary>
                   <ContentForm fields={section.fields} record={record} section={section.kind as 'experience' | 'story' | 'social'} />
+                  {sectionName === 'experiences' && (
+                    <ExperienceSharePanel id={String(record.id)} />
+                  )}
                   <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 px-5 py-4">
                     {String(record.status) === 'archived' ? (
                       <span className="text-xs text-zinc-500">Archived — hidden from the site but kept here. Restore it to bring it back.</span>
