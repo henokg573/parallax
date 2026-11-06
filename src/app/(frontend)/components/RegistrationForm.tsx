@@ -1,13 +1,20 @@
 'use client'
 
 import { useActionState } from 'react'
-import { initialState, registerForExperience } from '@/app/(frontend)/actions/register'
+import { registerForExperience, type RegistrationState } from '@/app/(frontend)/actions/register'
+
+const initialState: RegistrationState = {
+  success: false,
+  message: '',
+}
 
 const labels = {
   en: {
     fullName: 'Full name',
     email: 'Email',
     phone: 'Phone',
+    preferredChannel: 'Preferred communication channel',
+    preferredChannelHelp: 'We will use this channel for registration updates.',
     reference: 'Payment reference',
     receipt: 'Payment receipt',
     receiptHelp: 'Upload a screenshot or PDF (maximum 5 MB).',
@@ -18,6 +25,8 @@ const labels = {
     fullName: 'ሙሉ ስም',
     email: 'ኢሜይል',
     phone: 'ስልክ',
+    preferredChannel: 'የመገናኛ መንገድ',
+    preferredChannelHelp: 'ለምዝገባ ዝመናዎች ይህን መንገድ እንጠቀማለን።',
     reference: 'የክፍያ ማጣቀሻ',
     receipt: 'የክፍያ ደረሰኝ',
     receiptHelp: 'ስክሪንሾት ወይም PDF ይጫኑ (ከፍተኛ 5 MB)።',
@@ -58,6 +67,17 @@ export function RegistrationForm({
         <span>{copy.phone}</span>
         <input name="phone" required autoComplete="tel" />
         {state.errors?.phone && <small>{state.errors.phone}</small>}
+      </label>
+      <label>
+        <span>{copy.preferredChannel}</span>
+        <select name="preferredChannel" defaultValue="email" required>
+          <option value="email">Email</option>
+          <option value="phone">Phone call</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="telegram">Telegram</option>
+        </select>
+        <small className="field-help">{copy.preferredChannelHelp}</small>
+        {state.errors?.preferredChannel && <small>{state.errors.preferredChannel}</small>}
       </label>
       <label>
         <span>{copy.reference}</span>

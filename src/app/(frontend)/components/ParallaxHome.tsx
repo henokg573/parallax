@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { PublicHomeContent, PublicMedia, PublicVideo } from '@/lib/public-content'
-import { RegistrationForm } from './RegistrationForm'
 
 type IconName =
   | 'arrow'
@@ -331,7 +330,6 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
   const [language, setLanguage] = useState<'en' | 'am'>('en')
   const [subscribed, setSubscribed] = useState(false)
   const [reelIndex, setReelIndex] = useState(0)
-  const [registrationExperienceID, setRegistrationExperienceID] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const { experiences, stories, socialPosts, socialLinks } = content[language]
   const t = copy[language]
@@ -371,6 +369,7 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
     })
   }
   for (const event of experiences) {
+    if (String(event.id) === String(featured?.id)) continue
     if (reelItems.length >= 8) break
     if (event.video) {
       reelItems.push({
@@ -592,10 +591,7 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                   {reelItems[reelIndex]?.kind === 'experience' ? (
                     <a
                       className="button button-gold reel-follow-button"
-                      href="#events"
-                      onClick={() => {
-                        setRegistrationExperienceID(reelItems[reelIndex]?.experienceID || null)
-                      }}
+                      href={`/register/${reelItems[reelIndex]?.experienceID || ''}`}
                     >
                       <Icon name="check" size={15} /> {t.register}
                     </a>
@@ -620,6 +616,13 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                     <i /> {t.registrationOpen}
                   </span>
                 </div>
+                {featured.image && (
+                  <img
+                    className="next-card-image"
+                    src={featured.image.url}
+                    alt={featured.image.alt || featured.title}
+                  />
+                )}
                 <div className="next-date">
                   <strong>{eventDate(featured.startDate, language).day}</strong>
                   <span>
@@ -632,9 +635,17 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                 <p>
                   <Icon name="mountain" size={16} /> {featured.kind} · {featured.location}
                 </p>
-                <a href="#events">
-                  {t.seeExperience} <Icon name="arrow" size={17} />
-                </a>
+                <div className="next-card-actions">
+                  <a href="#events">
+                    {t.seeExperience} <Icon name="arrow" size={17} />
+                  </a>
+                  <a
+                    className="next-card-register"
+                    href={`/register/${featured.id}`}
+                  >
+                    {t.register} <Icon name="check" size={15} />
+                  </a>
+                </div>
               </aside>
             )}
           </div>
@@ -745,17 +756,19 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                           {t.externalRegistration} <Icon name="arrow" size={16} />
                         </a>
                       )}
-                        <details
-                          className="registration-panel"
-                          id={`registration-${event.id}`}
-                          open={registrationExperienceID === String(event.id)}
-                          onToggle={(toggleEvent) => {
-                            if (!toggleEvent.currentTarget.open) setRegistrationExperienceID(null)
-                          }}
+                      {event.resourceURL && (
+                        <a
+                          className="external-registration"
+                          href={event.resourceURL}
+                          target="_blank"
+                          rel="noreferrer"
                         >
-                        <summary>{t.register}</summary>
-                        <RegistrationForm experienceID={String(event.id)} locale={language} />
-                      </details>
+                          {language === 'am' ? 'ተጨማሪ መረጃ' : 'More information'} <Icon name="arrow" size={16} />
+                        </a>
+                      )}
+                      <a className="external-registration" href={`/register/${event.id}`}>
+                        {t.register} <Icon name="arrow" size={16} />
+                      </a>
                     </div>
                   </article>
                 )

@@ -26,6 +26,7 @@ export type PublicExperience = {
   price?: number | null
   currency?: string | null
   registrationURL?: string | null
+  resourceURL?: string | null
   image: PublicMedia | null
   video: PublicVideo | null
 }
@@ -79,7 +80,10 @@ type ExperienceRow = {
   currency: string | null
   registration_url: string | null
   image_id: number | null
+  image_url: string | null
   video_id: number | null
+  resource_url: string | null
+  resource_id: number | null
 }
 
 type StoryRow = {
@@ -116,6 +120,10 @@ type MediaRow = {
   mime_type: string
 }
 
+function publicResourceURL(media: MediaRow | undefined): string | null {
+  return media ? publicMediaURL(media.filename) : null
+}
+
 function mediaValue(media: MediaRow | undefined): PublicMedia | null {
   if (!media) return null
   return {
@@ -135,12 +143,29 @@ function videoValue(media: MediaRow | undefined): PublicVideo | null {
   }
 }
 
+const experienceSelect = 'id, title_en, title_am, kind, summary_en, summary_am, location_en, location_am, start_date, end_date, capacity, price, currency, registration_url, image_url, resource_url, resource_id, image_id, video_id'
+const legacyExperienceSelect = 'id, title_en, title_am, kind, summary_en, summary_am, location_en, location_am, start_date, end_date, capacity, price, currency, registration_url, image_id, video_id'
+
+async function getPublicExperiences(): Promise<ExperienceRow[]> {
+  try {
+    return await rows<ExperienceRow>('experiences', {
+      select: experienceSelect,
+      eq: { status: 'published' }, order: { column: 'start_date' }, limit: 6,
+    })
+  } catch (error) {
+    if (!String(error).includes('image_url') && !String(error).includes('resource_url') && !String(error).includes('resource_id')) throw error
+
+    const legacyRows = await rows<Omit<ExperienceRow, 'image_url' | 'resource_url' | 'resource_id'>>('experiences', {
+      select: legacyExperienceSelect,
+      eq: { status: 'published' }, order: { column: 'start_date' }, limit: 6,
+    })
+    return legacyRows.map((item) => ({ ...item, image_url: null, resource_url: null, resource_id: null }))
+  }
+}
+
 export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicHomeContent> {
   const [experiences, stories, socialPosts, socialLinks] = await Promise.all([
-    rows<ExperienceRow>('experiences', {
-      select: 'id, title_en, title_am, kind, summary_en, summary_am, location_en, location_am, start_date, end_date, capacity, price, currency, registration_url, image_id, video_id',
-      eq: { status: 'published' }, order: { column: 'start_date' }, limit: 6,
-    }),
+    getPublicExperiences(),
     rows<StoryRow>('stories', {
       select: 'id, title_en, title_am, excerpt_en, excerpt_am, body_en, body_am, author_name_en, author_name_am, image_id, video_id',
       eq: { status: 'published' }, order: { column: 'published_at', ascending: false }, limit: 3,
@@ -156,7 +181,7 @@ export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicH
     }).catch(() => []),
   ])
 
-  const mediaIDs = [...experiences.flatMap((item) => [item.image_id, item.video_id]), ...stories.flatMap((item) => [item.image_id, item.video_id]), ...socialPosts.flatMap((item) => [item.thumbnail_id, item.video_id])]
+  const mediaIDs = [...experiences.flatMap((item) => [item.image_id, item.video_id, item.resource_id]), ...stories.flatMap((item) => [item.image_id, item.video_id]), ...socialPosts.flatMap((item) => [item.thumbnail_id, item.video_id])]
     .filter((id): id is number => id !== null)
   const media = mediaIDs.length
     ? await rows<MediaRow>('media', { select: 'id, filename, alt, width, height, mime_type', in: { id: mediaIDs } })
@@ -177,8 +202,14 @@ export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicH
       price: item.price === null ? null : Number(item.price),
       currency: item.currency,
       registrationURL: item.registration_url,
-      image: mediaValue(mediaByID.get(item.image_id ?? -1)),
+      image: mediaValue(mediaByID.get(item.image_id ?? -1)) || (item.image_url ? {
+        url: item.image_url,
+        alt: item.title_en,
+        width: 1600,
+        height: 1000,
+      } : null),
       video: videoValue(mediaByID.get(item.video_id ?? -1)),
+      resourceURL: item.resource_url || publicResourceURL(mediaByID.get(item.resource_id ?? -1)),
     })),
     stories: stories.map((item) => ({
       id: item.id,

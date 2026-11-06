@@ -1,23 +1,15 @@
 import { cookies } from 'next/headers'
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createPublicClient } from '@/utils/supabase/server'
 
 export const PUBLIC_MEDIA_BUCKET = 'parallax-media'
 export const PRIVATE_RECEIPTS_BUCKET = 'parallax-receipts'
 
 type StorageBucket = typeof PUBLIC_MEDIA_BUCKET | typeof PRIVATE_RECEIPTS_BUCKET
 
-async function getStorage() {
-  const supabase = createClient(await cookies())
+async function getStorage(publicAccess = false) {
+  const cookieStore = await cookies()
+  const supabase = publicAccess ? createPublicClient(cookieStore) : createClient(cookieStore)
   return supabase.storage
-}
-
-async function ensureBucket(bucket: StorageBucket, isPublic: boolean) {
-  const storage = await getStorage()
-  const { error } = await storage.createBucket(bucket, { public: isPublic })
-  if (error && !/already exists|duplicate/i.test(error.message)) {
-    throw new Error(error.message)
-  }
-  return storage
 }
 
 export async function uploadStorageFile(
@@ -25,8 +17,9 @@ export async function uploadStorageFile(
   path: string,
   data: Buffer,
   contentType: string,
+  publicAccess = false,
 ) {
-  const storage = await ensureBucket(bucket, bucket === PUBLIC_MEDIA_BUCKET)
+  const storage = await getStorage(publicAccess)
   const { error } = await storage.from(bucket).upload(path, data, {
     contentType,
     upsert: false,
@@ -49,8 +42,8 @@ export async function downloadStorageFile(bucket: StorageBucket, path: string) {
   return Buffer.from(await data.arrayBuffer())
 }
 
-export async function removeStorageFile(bucket: StorageBucket, path: string) {
-  const storage = await getStorage()
+export async function removeStorageFile(bucket: StorageBucket, path: string, publicAccess = false) {
+  const storage = await getStorage(publicAccess)
   const { error } = await storage.from(bucket).remove([path])
   if (error) throw new Error(error.message)
 }

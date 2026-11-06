@@ -1,7 +1,7 @@
 import React from 'react'
 import type { Metadata } from 'next'
 import Script from 'next/script'
-import { BodyCustomCode, renderHeadCustomCode } from '@/lib/make-custom-code'
+import { BodyCustomCode } from '@/lib/make-custom-code'
 import { makeSiteSettings, sanitizeHtmlAttribute } from '@/lib/make-site-settings'
 import './styles.css'
 
@@ -39,12 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const customScripts = makeSiteSettings.customScripts
 
   return (
-    <html lang={language}>
-      <head>
-        {renderHeadCustomCode(customScripts?.headStart, 'head-start')}
-        {renderHeadCustomCode(customScripts?.headEnd, 'head-end')}
-      </head>
-      <body className="min-h-screen bg-white text-zinc-950 antialiased">
+    <div lang={language} className="min-h-screen bg-white text-zinc-950 antialiased">
         <BodyCustomCode html={customScripts?.bodyStart} />
         {addBypassLinks && (
           <a className="figma-bypass-link" href="#root">
@@ -71,7 +66,6 @@ gtag('config', ${JSON.stringify(googleAnalyticsId)});
           </>
         )}
         <BodyCustomCode html={customScripts?.bodyEnd} />
-      </body>
-    </html>
+    </div>
   )
 }
