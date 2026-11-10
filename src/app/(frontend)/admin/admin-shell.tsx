@@ -126,7 +126,7 @@ export default function AdminShell({
                     viewBox="0 0 24 24"
                     aria-hidden="true"
                   >
-                    <path d="M11 5.882V19.24a1.76 1.76 0 01-3.177 0c-.39-.977-.36-1.896-.36-2.224m0 0a6.723 6.723 0 003.537 1.042A6.72 6.72 0 0019 9.75a6.72 6.72 0 00-3.537-1.042 6.723 0 00-3.537-1.042m0 0V5.25a2.25 2.25 0 012.25-2.25h.09a2.25 2.25 0 012.25 2.25v.463" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M11 5.882V19.24a1.76 1.76 0 01-3.177 0c-.39-.977-.36-1.896-.36-2.224m0 0a6.723 6.723 0 003.537 1.042A6.72 6.72 0 0019 9.75a6.72 6.72 0 00-3.537-1.042 6.723 6.723 0 00-3.537-1.042m0 0V5.25a2.25 2.25 0 012.25-2.25h.09a2.25 2.25 0 012.25 2.25v.463" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Announcements
                   {active === '/admin/announcements' && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400" />}

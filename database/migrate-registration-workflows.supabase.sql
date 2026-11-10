@@ -78,7 +78,7 @@ BEGIN
     preferred_channel, payment_reference, check_in_token
   ) VALUES (
     p_experience_id, receipt_id, p_full_name, p_email, p_phone,
-    p_preferred_channel, p_payment_reference, p_check_in_token
+    p_preferred_channel, p_payment_reference, p_check_in_token::uuid
   ) RETURNING id INTO registration_id;
 
   RETURN registration_id;
