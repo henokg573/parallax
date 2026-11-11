@@ -1,0 +1,20 @@
+[33m6587f46[m[33m ([m[1;31morigin/main[m[33m)[m Fix CSS build: webpack bundler + magic-string override to 0.30.17
+[33m6a0e80c[m error update
+[33m8a1e86a[m Require Node 22 for builds (.nvmrc + engines)
+[33m705f7de[m updates on parallax
+[33mb576943[m registration change
+[33mefad786[m made changes on registration
+[33mb8c503e[m made changes on registration
+[33mbdb3cf6[m made some changes
+[33m18198f2[m made some changes
+[33ma9dbdb0[m made some changes
+[33m7d919e0[m added fonts by 50%
+[33m503f691[m fixing remaining errors
+[33m5bba795[m Serve static images as regular assets
+[33m2cecb62[m adding remaining functions
+[33m4db736f[m fixing some errors
+[33mb7b7d4b[m supabase and db
+[33mb35695f[m error
+[33m3cefb20[m chore: switch to npm, remove pnpm lockfile
+[33md8c8e16[m parallax after changed db and backend to supabase
+[33m8c8e553[m parallax
