@@ -1,5 +1,6 @@
 import { logoutAdmin } from './actions'
 import type { SafeAdmin } from '@/lib/admin-auth'
+import { InstallAppButton } from '../components/InstallAppButton'
 
 const navItems = [
   { href: '/admin', label: 'Home', icon: 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h12a1 1 0 001-1V10' },
@@ -34,6 +35,11 @@ const sidebarGroups = [
   },
 ]
 
+const mobileMoreItems = [
+  { href: '/admin/social', label: 'Social wall', icon: sidebarGroups[1].items[2].icon },
+  { href: '/admin/scan', label: 'Scan ticket', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9zM15 13a3 3 0 11-6 0 3 3 0 016 0z' },
+]
+
 export function roleLabel(role: string) {
   const labels: Record<string, string> = {
     'super-admin': 'Super admin',
@@ -58,8 +64,24 @@ export default function AdminShell({
   children: React.ReactNode
 }) {
   const mobileItems = admin.role === 'check-in'
-    ? navItems.filter((item) => item.href === '/admin/registrations' || item.href === '/admin')
+    ? [
+        navItems.find((item) => item.href === '/admin/registrations')!,
+        mobileMoreItems.find((item) => item.href === '/admin/scan')!,
+      ]
     : navItems
+  const moreItems = admin.role === 'check-in'
+    ? [{ href: '/admin/settings', label: 'Account settings', icon: 'M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z' }]
+    : [
+        { href: '/admin/settings', label: 'Account settings', icon: 'M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z' },
+        ...mobileMoreItems,
+        ...(admin.role === 'super-admin'
+          ? [
+              { href: '/admin/announcements', label: 'Announcements', icon: 'M11 5.882V19.24a1.76 1.76 0 01-3.177 0c-.39-.977-.36-1.896-.36-2.224m0 0a6.723 6.723 0 003.537 1.042A6.72 6.72 0 0019 9.75a6.72 6.72 0 00-3.537-1.042 6.723 6.723 0 00-3.537-1.042m0 0V5.25a2.25 2.25 0 012.25-2.25h.09a2.25 2.25 0 012.25 2.25v.463' },
+              { href: '/admin/social-links', label: 'Social accounts', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z' },
+              { href: '/admin/admins', label: 'Team accounts', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+            ]
+          : []),
+      ]
 
   return (
     <div className="min-h-screen bg-zinc-100 lg:flex">
@@ -74,39 +96,41 @@ export default function AdminShell({
         </a>
 
         <nav aria-label="Admin sections" className="mt-8 flex flex-1 flex-col gap-6 overflow-y-auto">
-          {sidebarGroups.map((group) => (
-            <div key={group.label}>
-              <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-600">{group.label}</p>
-              <div className="grid gap-1">
-                {group.items.map((item) => {
-                  const isActive = active === item.href
-                  return (
-                    <a
-                      className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${isActive
-                          ? 'bg-emerald-500/10 text-emerald-300'
-                          : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
-                        }`}
-                      href={item.href}
-                      key={item.href}
-                    >
-                      <svg
-                        className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'}`}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.8}
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
+          {sidebarGroups
+            .filter((group) => admin.role !== 'check-in' || group.label !== 'Content')
+            .map((group) => (
+              <div key={group.label}>
+                <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-600">{group.label}</p>
+                <div className="grid gap-1">
+                  {group.items.map((item) => {
+                    const isActive = active === item.href
+                    return (
+                      <a
+                        className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${isActive
+                            ? 'bg-emerald-500/10 text-emerald-300'
+                            : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+                          }`}
+                        href={item.href}
+                        key={item.href}
                       >
-                        <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      {item.label}
-                      {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400" />}
-                    </a>
-                  )
-                })}
+                        <svg
+                          className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'}`}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        {item.label}
+                        {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400" />}
+                      </a>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
           {admin.role === 'super-admin' && (
             <div>
               <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-600">Administration</p>
@@ -170,6 +194,18 @@ export default function AdminShell({
         </nav>
 
         <div className="border-t border-zinc-800 pt-4">
+          <a
+            aria-current={active === '/admin/settings' ? 'page' : undefined}
+            className={`mb-3 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${
+              active === '/admin/settings' ? 'bg-emerald-500/10 text-emerald-300' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+            }`}
+            href="/admin/settings"
+          >
+            <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM19.4 15a1.7 1.7 0 00.34 1.88l.06.06-1.5 2.6-.08-.02a1.7 1.7 0 00-1.8.6l-.05.07h-3l-.04-.08a1.7 1.7 0 00-1.52-1.03 1.7 1.7 0 00-.67.14l-.08.03-2.6-1.5.02-.08a1.7 1.7 0 00-.6-1.8l-.07-.05v-3l.08-.04a1.7 1.7 0 001.03-1.52 1.7 1.7 0 00-.14-.67l-.03-.08 1.5-2.6.08.02a1.7 1.7 0 001.8-.6l.05-.07h3l.04.08a1.7 1.7 0 001.52 1.03 1.7 1.7 0 00.67-.14l.08-.03 2.6 1.5-.02.08a1.7 1.7 0 00.6 1.8l.07.05v3l-.08.04a1.7 1.7 0 00-.29.42z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Account settings
+          </a>
           <div className="flex items-center gap-3 px-1">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/15 text-sm font-bold text-emerald-400">
               {admin.display_name.slice(0, 1).toUpperCase()}
@@ -201,13 +237,46 @@ export default function AdminShell({
               Exit
             </button>
           </form>
+          {moreItems.length > 0 && (
+            <details className="relative shrink-0">
+              <summary className="cursor-pointer list-none rounded-lg border border-zinc-300 px-2.5 py-1.5 text-xs font-semibold text-zinc-700">
+                More
+              </summary>
+              <nav
+                aria-label="More admin sections"
+                className="absolute right-0 top-full z-50 mt-2 grid max-h-[calc(100dvh-5rem)] w-64 gap-1 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-2 shadow-xl"
+              >
+                {moreItems.map((item) => (
+                  <a
+                    aria-current={active === item.href ? 'page' : undefined}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                      active === item.href ? 'bg-emerald-50 text-emerald-800' : 'text-zinc-700 hover:bg-zinc-100'
+                    }`}
+                    href={item.href}
+                    key={item.href}
+                  >
+                    <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                      <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {item.label}
+                  </a>
+                ))}
+                <InstallAppButton className="rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-emerald-800 hover:bg-emerald-50" />
+              </nav>
+            </details>
+          )}
         </header>
 
         {/* Desktop page header */}
         <header className="hidden border-b border-zinc-200 bg-white/80 px-5 py-4 backdrop-blur lg:block lg:sticky lg:top-0 lg:z-20">
           <div className="mx-auto max-w-6xl">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-950">{title}</h1>
-            {subtitle && <p className="mt-0.5 text-sm text-zinc-500">{subtitle}</p>}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-zinc-950">{title}</h1>
+                {subtitle && <p className="mt-0.5 text-sm text-zinc-500">{subtitle}</p>}
+              </div>
+              <InstallAppButton className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50" />
+            </div>
           </div>
         </header>
 

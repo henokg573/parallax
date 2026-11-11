@@ -14,7 +14,7 @@ const labels = {
     email: 'Email',
     phone: 'Phone',
     preferredChannel: 'Preferred communication channel',
-    preferredChannelHelp: 'We will use this channel for registration updates.',
+    preferredChannelHelp: 'We will use this channel for updates and share your registration details with the Parallax team for review.',
     reference: 'Payment reference',
     receipt: 'Payment receipt',
     receiptHelp: 'Upload a screenshot or PDF (maximum 5 MB).',
@@ -26,7 +26,7 @@ const labels = {
     email: 'ኢሜይል',
     phone: 'ስልክ',
     preferredChannel: 'የመገናኛ መንገድ',
-    preferredChannelHelp: 'ለምዝገባ ዝመናዎች ይህን መንገድ እንጠቀማለን።',
+    preferredChannelHelp: 'ለምዝገባ ዝመናዎች ይህን መንገድ እንጠቀማለን፤ ዝርዝሮችዎንም ለParallax ቡድን እንጋራለን።',
     reference: 'የክፍያ ማጣቀሻ',
     receipt: 'የክፍያ ደረሰኝ',
     receiptHelp: 'ስክሪንሾት ወይም PDF ይጫኑ (ከፍተኛ 5 MB)።',
@@ -46,7 +46,14 @@ export function RegistrationForm({
   const copy = labels[locale]
 
   if (state.success) {
-    return <p className="registration-success">{state.message}</p>
+    return (
+      <div className="grid gap-2">
+        <p className="registration-success">{state.message}</p>
+        {state.notificationWarning && (
+          <p className="form-message" role="status">{state.notificationWarning}</p>
+        )}
+      </div>
+    )
   }
 
   return (

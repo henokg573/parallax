@@ -56,6 +56,7 @@ export default async function RegistrationsDashboard({
       {query.saved && <Banner tone="green">Changes saved.</Banner>}
       {query.published && <Banner tone="green">Registration published successfully.</Banner>}
       {query.bulk && <Banner tone="green">Bulk update applied.</Banner>}
+      {query.telegram === 'failed' && <Banner tone="amber">The registration change was saved, but its Telegram notification failed. Check the Telegram configuration on account settings.</Banner>}
       {query.archived && <Banner tone="amber">Registration archived.</Banner>}
       {query.denied && <Banner tone="amber">Only a super admin can permanently delete registrations.</Banner>}
 
@@ -289,5 +290,4 @@ function Banner({ tone, children }: { tone: 'green' | 'amber'; children: React.R
     : 'border-amber-200 bg-amber-50 text-amber-900'
   return <p className={`mb-4 rounded-xl border px-4 py-3 text-sm font-medium ${styles}`}>{children}</p>
 }
-
 

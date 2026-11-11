@@ -1,8 +1,12 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { RegistrationForm } from '@/app/(frontend)/components/RegistrationForm'
-import { getPublicExperienceBySlug, isOpenForRegistration, CATEGORY_LABELS } from '@/lib/registrations'
-import { getPublicHomeContent } from '@/lib/public-content'
+import {
+  getPublicExperienceByID,
+  getPublicExperienceBySlug,
+  isOpenForRegistration,
+  CATEGORY_LABELS,
+} from '@/lib/registrations'
 import { rows } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
@@ -54,60 +58,18 @@ type PublicExperienceView = {
 }
 
 async function findExperience(experienceID: string): Promise<PublicExperienceView | null> {
-  // Try slug first (new builder), then fall back to numeric ID (existing links).
-  if (!/^\d+$/.test(experienceID)) {
-    const bySlug = await getPublicExperienceBySlug(experienceID).catch(() => null)
-    if (bySlug) return bySlug as unknown as PublicExperienceView
-  }
-  const content = await getPublicHomeContent('en')
-  const experience = content.experiences.find((item) => String(item.id) === experienceID)
-  if (!experience) return null
-  // Legacy record: map the camelCase public shape onto the unified view.
-  return {
-    id: String(experience.id),
-    title_en: experience.title,
-    title_am: '',
-    kind: experience.kind,
-    summary_en: experience.summary,
-    summary_am: '',
-    description_en: '',
-    description_am: '',
-    location_en: experience.location,
-    location_am: '',
-    address: '',
-    maps_url: '',
-    timezone: 'Africa/Addis_Ababa',
-    start_date: experience.startDate,
-    end_date: experience.endDate ?? null,
-    capacity: experience.capacity ?? null,
-    participant_count: 0,
-    unlimited_capacity: experience.capacity === null,
-    reg_opens_at: null,
-    reg_closes_at: null,
-    allow_after_start: true,
-    pricing_mode: experience.price !== null && experience.price !== undefined ? 'paid' : 'free',
-    price: experience.price ?? null,
-    currency: experience.currency ?? 'ETB',
-    payment_instructions: '',
-    payment_methods: '',
-    ticket_types: [],
-    status: 'published',
-    image_url: experience.image?.url ?? null,
-    gallery_ids: [],
-    video_url: experience.video?.url ?? null,
-    resources: [],
-    consent_notice: '',
-    terms_en: '',
-    terms_am: '',
-  }
+  const experience = /^\d+$/.test(experienceID)
+    ? await getPublicExperienceByID(Number(experienceID))
+    : await getPublicExperienceBySlug(experienceID)
+  return experience as PublicExperienceView | null
 }
 
 export async function generateMetadata({ params }: RegistrationPageProps): Promise<Metadata> {
   const { experienceID } = await params
-  const bySlug = /^\d+$/.test(experienceID) ? null : await getPublicExperienceBySlug(experienceID).catch(() => null)
+  const experience = await findExperience(experienceID)
   return {
-    title: `${bySlug?.title_en ?? 'Registration'} | Parallax`,
-    description: bySlug?.summary_en || 'Register for a Parallax community experience.',
+    title: `${experience?.title_en ?? 'Registration'} | Parallax`,
+    description: experience?.summary_en || 'Register for a Parallax community experience.',
   }
 }
 

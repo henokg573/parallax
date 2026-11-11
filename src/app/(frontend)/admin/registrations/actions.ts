@@ -8,6 +8,7 @@ import { getAdminSession } from '@/lib/admin-auth'
 import { insert, rows, update } from '@/lib/db'
 import { PUBLIC_MEDIA_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
 import { REGISTRATION_STATUS_VALUES } from '@/lib/registrations'
+import { sendRegistrationNotification } from '@/lib/telegram'
 
 function value(formData: FormData, key: string, max: number) {
   const field = formData.get(key)
@@ -458,7 +459,18 @@ export async function deleteExperience(formData: FormData) {
   redirect('/admin/registrations?archived=1')
 }
 
-type VerifyRow = { id: number; payment_status: string; email: string; check_in_token: string; ticket_email_sent_at: string | null }
+type VerifyRow = {
+  id: number
+  experience_id: number
+  payment_status: string
+  full_name: string
+  email: string
+  phone: string
+  preferred_channel: string
+  payment_reference: string
+  check_in_token: string
+  ticket_email_sent_at: string | null
+}
 
 export async function verifyParticipant(formData: FormData) {
   const admin = await getAdminSession()
@@ -474,11 +486,18 @@ export async function verifyParticipant(formData: FormData) {
   }
 
   const existing = await rows<VerifyRow>('registrations', {
-    select: 'id, payment_status, email, check_in_token, ticket_email_sent_at',
+    select: 'id, experience_id, payment_status, full_name, email, phone, preferred_channel, payment_reference, check_in_token, ticket_email_sent_at',
     eq: { id }, limit: 1,
   })
   const registration = existing[0]
   if (!registration) throw new Error('Registration not found.')
+  const experienceRows = decision !== registration.payment_status && decision !== 'pending'
+    ? await rows<{ title_en: string }>('experiences', {
+        select: 'title_en',
+        eq: { id: registration.experience_id },
+        limit: 1,
+      })
+    : []
 
   await update('registrations', {
     payment_status: decision,
@@ -487,6 +506,18 @@ export async function verifyParticipant(formData: FormData) {
     verified_at: new Date().toISOString(),
   }, { id })
   await logActivity(`payment-${decision}`, notes, id)
+
+  const notification = decision !== registration.payment_status && decision !== 'pending'
+    ? await sendRegistrationNotification({
+        id: registration.id,
+        experienceTitle: experienceRows[0]?.title_en || `Experience ${registration.experience_id}`,
+        fullName: registration.full_name,
+        email: registration.email,
+        phone: registration.phone,
+        preferredChannel: registration.preferred_channel,
+        paymentReference: registration.payment_reference,
+      }, decision as 'verified' | 'rejected')
+    : { ok: true as const }
 
   // Ticket QR email on first verification (reuses Resend integration).
   let emailFailed = false
@@ -523,7 +554,7 @@ export async function verifyParticipant(formData: FormData) {
   }
 
   revalidatePath(`/admin/registrations/${experienceID}`)
-  redirect(`/admin/registrations/${experienceID}?verified=${decision}${emailFailed ? '&email=failed' : ''}`)
+  redirect(`/admin/registrations/${experienceID}?verified=${decision}${emailFailed ? '&email=failed' : ''}${!notification.ok ? '&telegram=failed' : ''}`)
 }
 
 export async function bulkVerifyParticipants(formData: FormData) {
@@ -531,21 +562,49 @@ export async function bulkVerifyParticipants(formData: FormData) {
   if (!admin) redirect('/admin/login')
   if (admin.role === 'check-in') redirect('/admin')
 
-  const ids = numberList(formData, 'ids')
+  const ids = [...new Set(numberList(formData, 'ids'))]
   const decision = value(formData, 'decision', 20)
   const experienceID = value(formData, 'experience_id', 20)
   if (!ids.length || !['verified', 'rejected'].includes(decision)) throw new Error('Invalid bulk verification.')
 
+  const existing = await rows<VerifyRow>('registrations', {
+    select: 'id, experience_id, payment_status, full_name, email, phone, preferred_channel, payment_reference, check_in_token, ticket_email_sent_at',
+    in: { id: ids },
+  })
+  const existingByID = new Map(existing.map((registration) => [registration.id, registration]))
+  const experienceIDs = [...new Set(existing.map((registration) => registration.experience_id))]
+  const experiences = experienceIDs.length
+    ? await rows<{ id: number; title_en: string }>('experiences', {
+        select: 'id, title_en',
+        in: { id: experienceIDs },
+      })
+    : []
+  const experienceTitles = new Map(experiences.map((experience) => [experience.id, experience.title_en]))
+  let telegramFailed = false
+
   for (const id of ids) {
+    const registration = existingByID.get(id)
     await update('registrations', {
       payment_status: decision,
       verified_by: admin.email,
       verified_at: new Date().toISOString(),
     }, { id })
     await logActivity(`payment-bulk-${decision}`, '', id)
+    if (registration && registration.payment_status !== decision) {
+      const notification = await sendRegistrationNotification({
+        id: registration.id,
+        experienceTitle: experienceTitles.get(registration.experience_id) || `Experience ${registration.experience_id}`,
+        fullName: registration.full_name,
+        email: registration.email,
+        phone: registration.phone,
+        preferredChannel: registration.preferred_channel,
+        paymentReference: registration.payment_reference,
+      }, decision as 'verified' | 'rejected')
+      telegramFailed ||= !notification.ok
+    }
   }
   revalidatePath(`/admin/registrations/${experienceID}`)
-  redirect(`/admin/registrations/${experienceID}?bulk=1`)
+  redirect(`/admin/registrations/${experienceID}?bulk=1${telegramFailed ? '&telegram=failed' : ''}`)
 }
 
 export async function updateParticipant(formData: FormData) {

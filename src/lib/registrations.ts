@@ -449,17 +449,26 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 // —— public (anon RLS) reads for the public registration page ——
-export async function getPublicExperienceBySlug(slug: string) {
+async function getPublicExperience(where: { id: number } | { slug: string }) {
   const extended = await hasExtendedSchema()
   const data = await publicRows<Record<string, unknown>>('experiences', {
     select: extended ? EXTENDED_EXPERIENCE_SELECT : LEGACY_EXPERIENCE_SELECT,
-    eq: { slug },
+    eq: where,
     limit: 1,
   })
   if (!data[0]) return null
   const experience = normalizeExperience(data[0])
   const parts = await attachStats([experience])
   return parts[0]
+}
+
+export async function getPublicExperienceByID(id: number) {
+  if (!Number.isSafeInteger(id) || id <= 0) return null
+  return getPublicExperience({ id })
+}
+
+export async function getPublicExperienceBySlug(slug: string) {
+  return getPublicExperience({ slug })
 }
 
 export function isOpenForRegistration(experience: {

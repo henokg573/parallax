@@ -1208,6 +1208,9 @@ footer {
   .mobile-nav a:hover {
     color: var(--gold);
   }
+  .footer-bottom {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
   .next-card {
     display: none;
   }

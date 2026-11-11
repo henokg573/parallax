@@ -1,5 +1,5 @@
 import React from 'react'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import { BodyCustomCode } from '@/lib/make-custom-code'
 import { makeSiteSettings, sanitizeHtmlAttribute } from '@/lib/make-site-settings'
@@ -19,7 +19,16 @@ export const metadata: Metadata = {
   title,
   description,
   robots: makeSiteSettings.robots?.index === false ? { follow: false, index: false } : undefined,
-  icons: favicon ? { icon: favicon } : undefined,
+  icons: {
+    icon: favicon ?? '/icons/icon-192.png',
+    apple: '/icons/apple-touch-icon.png',
+  },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Parallax',
+  },
   openGraph: {
     title,
     description,
@@ -31,6 +40,11 @@ export const metadata: Metadata = {
         images: [socialImage],
       }
     : undefined,
+}
+
+export const viewport: Viewport = {
+  themeColor: '#0a2821',
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

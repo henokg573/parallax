@@ -25,4 +25,10 @@
 
 The home page, registration forms, protected receipt viewer, payment review, and staff check-in use MariaDB. Receipts are kept under `var/uploads/payment-receipts`; public media is under `public/uploads/media`. Admins can upload JPEG, PNG, WebP, GIF, MP4, WebM, and MOV media. Content videos are limited to 100 MB. The admin registration page displays a QR after payment approval, even when email is not configured; `/admin/scan` uses the device camera to check in verified tickets. Existing hosted content is not copied automatically.
 
+## Telegram registration notifications
+
+Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in the server environment (or in the untracked local `.env` file), then restart or redeploy the app. Never commit the bot token or expose it through a `NEXT_PUBLIC_*` variable. Add the bot to the target group with permission to send messages, then use **Admin → Account settings → Send test notification** to verify delivery.
+
+The bot sends an alert for each new registration and when an admin changes a participant to verified or rejected. New registration alerts include the participant's name, email, phone, preferred contact channel, payment reference, experience, and registration ID; the uploaded payment receipt is sent as a document with its registration ID. If Telegram is unavailable, the registration or admin decision is still saved and the app shows that the notification needs attention.
+
 Do not expose XAMPP or its default database credentials to the internet. Use a dedicated database user and strong password if this app is deployed beyond your local machine.

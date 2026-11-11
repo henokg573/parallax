@@ -89,6 +89,7 @@ export default async function RegistrationDetailPage({
       {query.bulk && <Banner tone="green">Bulk verification applied.</Banner>}
       {query.verified === 'verified' && <Banner tone="green">Payment verified and ticket emailed.</Banner>}
       {query.verified === 'rejected' && <Banner tone="amber">Payment rejected.</Banner>}
+      {query.telegram === 'failed' && <Banner tone="amber">The registration was saved, but its Telegram notification failed. Check the Telegram configuration on account settings.</Banner>}
       {query.email === 'failed' && <Banner tone="amber">Verified, but the ticket email could not be sent. Configure Resend to enable automatic emails.</Banner>}
       {query.checkin === 'success' && <Banner tone="green">✓ Checked in: {query.who}</Banner>}
       {query.checkin === 'duplicate' && <Banner tone="amber">Already checked in: {query.who}. Duplicate check-ins are prevented.</Banner>}

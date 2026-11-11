@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { PublicHomeContent, PublicMedia, PublicVideo } from '@/lib/public-content'
+import { InstallAppButton } from './InstallAppButton'
 
 type IconName =
   | 'arrow'
@@ -980,6 +981,8 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
           <p>© 2026 PARALLAX ETHIOPIA</p>
           <p>{t.tagline}</p>
           <a href="#top">{t.backToTop}</a>
+          <InstallAppButton className="text-xs font-semibold text-white/80" />
+          <a href="/admin/login">Team sign in</a>
         </div>
       </footer>
     </div>

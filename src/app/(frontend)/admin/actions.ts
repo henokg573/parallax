@@ -14,6 +14,7 @@ import {
 } from '@/lib/admin-auth'
 import { insert, remove, rows, update } from '@/lib/db'
 import { PUBLIC_MEDIA_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
+import { isTelegramConfigured, sendRegistrationNotification, sendTelegramMessage } from '@/lib/telegram'
 
 function value(formData: FormData, key: string, maxLength: number) {
   const field = formData.get(key)
@@ -224,6 +225,74 @@ export async function loginAdmin(formData: FormData) {
 export async function logoutAdmin() {
   await clearAdminSession()
   redirect('/admin/login')
+}
+
+export async function saveAdminProfile(formData: FormData) {
+  const admin = await getAdminSession()
+  if (!admin) redirect('/admin/login')
+
+  const currentPassword = String(formData.get('current_password') || '')
+  const displayName = value(formData, 'display_name', 120)
+  const email = value(formData, 'email', 190).toLowerCase()
+  if (displayName.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    redirect('/admin/settings?error=profile-invalid')
+  }
+
+  const account = await rows<{ password_hash: string }>('admins', {
+    select: 'password_hash',
+    eq: { id: admin.id },
+    limit: 1,
+  })
+  if (!account[0] || !verifyPassword(currentPassword, account[0].password_hash)) {
+    redirect('/admin/settings?error=current-password')
+  }
+
+  const duplicate = await rows<{ id: number }>('admins', {
+    select: 'id',
+    eq: { email },
+    neq: { id: admin.id },
+    limit: 1,
+  })
+  if (duplicate.length) redirect('/admin/settings?error=email-taken')
+
+  await update('admins', { display_name: displayName, email }, { id: admin.id })
+  redirect('/admin/settings?profile=saved')
+}
+
+export async function changeAdminPassword(formData: FormData) {
+  const admin = await getAdminSession()
+  if (!admin) redirect('/admin/login')
+
+  const currentPassword = String(formData.get('current_password') || '')
+  const newPassword = String(formData.get('new_password') || '')
+  const confirmPassword = String(formData.get('confirm_password') || '')
+  if (newPassword.length < 12 || newPassword.length > 200) {
+    redirect('/admin/settings?error=password-length')
+  }
+  if (newPassword !== confirmPassword) redirect('/admin/settings?error=password-mismatch')
+  if (newPassword === currentPassword) redirect('/admin/settings?error=password-unchanged')
+
+  const account = await rows<{ password_hash: string }>('admins', {
+    select: 'password_hash',
+    eq: { id: admin.id },
+    limit: 1,
+  })
+  if (!account[0] || !verifyPassword(currentPassword, account[0].password_hash)) {
+    redirect('/admin/settings?error=current-password')
+  }
+
+  await update('admins', { password_hash: hashPassword(newPassword) }, { id: admin.id })
+  await setAdminSession(admin.id)
+  redirect('/admin/settings?password=saved')
+}
+
+export async function testTelegramConnection() {
+  const admin = await getAdminSession()
+  if (!admin || admin.role !== 'super-admin') redirect('/admin/login')
+  if (!isTelegramConfigured()) redirect('/admin/settings?telegram=not-configured')
+
+  const result = await sendTelegramMessage('<b>Parallax Telegram test</b>\nThe registration notification bot is connected.')
+  redirect(`/admin/settings?telegram=${result.ok ? 'sent' : 'failed'}`)
 }
 
 export async function saveContent(formData: FormData) {
@@ -521,8 +590,12 @@ export async function uploadMedia(formData: FormData) {
 
 type RegistrationMailRow = RowDataPacket & {
   id: number
+  experience_id: number
   email: string
   full_name: string
+  phone: string
+  preferred_channel: string
+  payment_reference: string
   check_in_token: string
   payment_status: string
   ticket_email_sent_at: string | null
@@ -541,13 +614,34 @@ export async function updateRegistration(formData: FormData) {
   const internalNotes = value(formData, 'internal_notes', 5000)
 
   const existingRows = await rows<RegistrationMailRow>('registrations', {
-    select: 'id, email, full_name, check_in_token, payment_status, ticket_email_sent_at',
+    select: 'id, experience_id, email, full_name, phone, preferred_channel, payment_reference, check_in_token, payment_status, ticket_email_sent_at',
     eq: { id },
     limit: 1,
   })
   const registration = existingRows[0]
   if (!registration) throw new Error('Registration not found.')
+  const experienceRows = status !== registration.payment_status && status !== 'pending'
+    ? await rows<{ title_en: string }>('experiences', {
+        select: 'title_en',
+        eq: { id: registration.experience_id },
+        limit: 1,
+      })
+    : []
   await update('registrations', { payment_status: status, internal_notes: internalNotes }, { id })
+
+  let telegramFailed = false
+  if (status !== registration.payment_status && status !== 'pending') {
+    const notification = await sendRegistrationNotification({
+      id: registration.id,
+      experienceTitle: experienceRows[0]?.title_en || `Experience ${registration.experience_id}`,
+      fullName: registration.full_name,
+      email: registration.email,
+      phone: registration.phone,
+      preferredChannel: registration.preferred_channel,
+      paymentReference: registration.payment_reference,
+    }, status as 'verified' | 'rejected')
+    telegramFailed = !notification.ok
+  }
 
   let emailFailed = false
   if (status === 'verified' && registration && !registration.ticket_email_sent_at) {
@@ -581,7 +675,7 @@ export async function updateRegistration(formData: FormData) {
     }
   }
 
-  redirect(`/admin/registrations?saved=1${emailFailed ? '&email=failed' : ''}`)
+  redirect(`/admin/registrations?saved=1${emailFailed ? '&email=failed' : ''}${telegramFailed ? '&telegram=failed' : ''}`)
 }
 
 export async function createAdmin(formData: FormData) {

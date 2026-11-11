@@ -1,13 +1,18 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
-import { publicRpc } from '@/lib/db'
+import { publicRpc, publicRows } from '@/lib/db'
 import { PRIVATE_RECEIPTS_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
+import {
+  sendRegistrationNotification,
+  sendRegistrationReceiptNotification,
+} from '@/lib/telegram'
 
 export type RegistrationState = {
   success: boolean
   message: string
   errors?: Record<string, string>
+  notificationWarning?: string
 }
 
 function text(formData: FormData, name: string, max: number): string {
@@ -25,6 +30,7 @@ const messages = {
     paymentReceipt: 'Upload a screenshot or PDF receipt up to 5 MB.',
     check: 'Please check the highlighted fields.',
     success: 'Registration received. We will email your QR ticket after payment verification.',
+    notificationWarning: 'The registration was saved, but the team notification could not be delivered. Please contact Parallax if you need help.',
     failure: 'We could not submit this registration. The experience may no longer be open.',
   },
   am: {
@@ -36,6 +42,7 @@ const messages = {
     paymentReceipt: 'እስከ 5 MB የሆነ ስክሪንሾት ወይም PDF ደረሰኝ ይጫኑ።',
     check: 'ምልክት የተደረገባቸውን መስኮች ያረጋግጡ።',
     success: 'ምዝገባዎ ደርሷል። ክፍያው ከተረጋገጠ በኋላ የQR ትኬትዎን በኢሜይል እንልካለን።',
+    notificationWarning: 'ምዝገባው ተቀምጧል፣ ግን የቡድን ማሳወቂያው አልደረሰም። እርዳታ ከፈለጉ Parallaxን ያነጋግሩ።',
     failure: 'ምዝገባውን ማስገባት አልቻልንም። ዝግጅቱ ለምዝገባ ዝግ ሊሆን ይችላል።',
   },
 } as const
@@ -117,7 +124,7 @@ export async function registerForExperience(
       true,
     )
 
-    await publicRpc('create_public_registration', {
+    const registrationID = await publicRpc<number>('create_public_registration', {
       p_experience_id: experience,
       p_filename: storageName,
       p_original_filename: receiptFile.name.replace(/[/\\\0]/g, '').slice(0, 255),
@@ -131,9 +138,40 @@ export async function registerForExperience(
       p_check_in_token: randomUUID(),
     })
 
+    let notificationFailed = false
+    try {
+      const experiences = await publicRows<{ title_en: string }>('experiences', {
+        select: 'title_en',
+        eq: { id: experience },
+        limit: 1,
+      })
+      const registration = {
+        id: Number(registrationID),
+        experienceTitle: experiences[0]?.title_en || `Experience ${experience}`,
+        fullName,
+        email,
+        phone,
+        preferredChannel,
+        paymentReference,
+      }
+      const [notification, receiptNotification] = await Promise.all([
+        sendRegistrationNotification(registration, 'new'),
+        sendRegistrationReceiptNotification(registration, {
+          bytes: receiptBytes,
+          filename: receiptFile.name.replace(/[/\\\0]/g, '').slice(0, 128) || `receipt.${mimeExtensions[receiptFile.type]}`,
+          contentType: receiptFile.type,
+        }),
+      ])
+      notificationFailed = !notification.ok || !receiptNotification.ok
+    } catch (error) {
+      notificationFailed = true
+      console.error('[telegram] New registration notification could not be prepared.', error)
+    }
+
     return {
       success: true,
       message: copy.success,
+      notificationWarning: notificationFailed ? copy.notificationWarning : undefined,
     }
   } catch (error) {
     if (receiptStoragePath) await removeStorageFile(PRIVATE_RECEIPTS_BUCKET, receiptStoragePath).catch(() => undefined)
