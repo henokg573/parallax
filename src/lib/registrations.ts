@@ -5,7 +5,7 @@ import { rows, publicRows } from '@/lib/db'
 import { publicMediaURL } from '@/lib/storage'
 
 import {
-  CATEGORY_LABELS, FIELD_TYPES,
+  FIELD_TYPES,
 } from '@/lib/registration-constants'
 
 export {
@@ -236,30 +236,35 @@ export async function listRegistrations(options: ListOptions = {}): Promise<Expe
 export async function attachStats(items: ExperienceLike[]): Promise<ExperienceListItem[]> {
   const ids = items.map((item) => item.id)
   if (!ids.length) return []
+  // Prices are the authoritative fallback whenever a registration row has no
+  // stored amount (older rows, or RPCs created before amount tracking existed).
+  const prices = await rows<{ id: number; price: number | null }>('experiences', {
+    select: 'id, price', in: { id: ids },
+  }).catch(() => [] as { id: number; price: number | null }[])
+  const priceByExperience = new Map(prices.map((item) => [Number(item.id), Number(item.price ?? 0)]))
+
   const regs = await rows<Record<string, unknown>>('registrations', {
     select: 'id, experience_id, payment_status, amount',
     in: { experience_id: ids },
   }).catch(async (): Promise<Record<string, unknown>[]> => {
-    // Legacy schema: no `amount` column — estimate revenue from the experience price.
+    // Legacy schema: no `amount` column — derive revenue purely from the price.
     const legacy = (await rows<Record<string, unknown>>('registrations', {
       select: 'id, experience_id, payment_status',
       in: { experience_id: ids },
     }).catch(() => [])) as Record<string, unknown>[]
-    const prices = await rows<{ id: number; price: number | null }>('experiences', {
-      select: 'id, price', in: { id: ids },
-    }).catch(() => [] as { id: number; price: number | null }[])
-    const priceByExperience = new Map(prices.map((item) => [Number(item.id), Number(item.price ?? 0)]))
-    return legacy.map((reg) => ({ ...reg, amount: priceByExperience.get(Number(reg.experience_id)) ?? null }))
+    return legacy.map((reg) => ({ ...reg, amount: null }))
   })
   const stats = new Map<number, { count: number; verified: number; revenue: number }>()
   for (const reg of regs) {
-    const entry = stats.get(Number(reg.experience_id)) ?? { count: 0, verified: 0, revenue: 0 }
+    const experienceID = Number(reg.experience_id)
+    const entry = stats.get(experienceID) ?? { count: 0, verified: 0, revenue: 0 }
     if (reg.payment_status !== 'rejected') entry.count += 1
     if (reg.payment_status === 'verified') {
       entry.verified += 1
-      entry.revenue += Number(reg.amount ?? 0)
+      const stored = reg.amount === null || reg.amount === undefined ? null : Number(reg.amount)
+      entry.revenue += stored ?? priceByExperience.get(experienceID) ?? 0
     }
-    stats.set(Number(reg.experience_id), entry)
+    stats.set(experienceID, entry)
   }
   return items.map((item) => {
     const entry = stats.get(item.id) ?? { count: 0, verified: 0, revenue: 0 }
@@ -372,11 +377,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const [opportunities, participantsRaw] = await Promise.all([
     rows<{ id: number }>('experiences', { select: 'id' }),
     rows<Record<string, unknown>>('registrations', {
-      select: 'id, payment_status, amount, currency, checked_in_at, created_at',
+      select: 'id, payment_status, amount, currency, checked_in_at, created_at, experience_id',
     }).catch(async (): Promise<Record<string, unknown>[]> => {
-      // Legacy schema: the v2 columns (amount/currency) don't exist yet.
-      // Fall back to the always-present columns and estimate revenue from the
-      // experience price instead.
+      // Legacy schema: the v2 columns (amount/currency) don't exist yet —
+      // derive stats from legacy columns plus the experience price.
       const legacy = (await rows<Record<string, unknown>>('registrations', {
         select: 'id, payment_status, checked_in_at, created_at, experience_id',
       }).catch(() => [])) as Record<string, unknown>[]
@@ -390,6 +394,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       })
     }),
   ])
+
+  const allPrices = await rows<{ id: number; price: number | null }>('experiences', {
+    select: 'id, price',
+  }).catch(() => [] as { id: number; price: number | null }[])
+  const priceByExperience = new Map(allPrices.map((item) => [Number(item.id), Number(item.price ?? 0)]))
   const participants = participantsRaw
 
   let pending = 0
@@ -408,7 +417,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     }
     if (reg.payment_status === 'verified' && reg.checked_in_at) checkedIn += 1
     if (reg.payment_status === 'verified') {
-      const amount = reg.amount !== undefined && reg.amount !== null ? Number(reg.amount) : 0
+      const stored = reg.amount === undefined || reg.amount === null ? null : Number(reg.amount)
+      const amount = stored ?? Number(priceByExperience.get(Number(reg.experience_id)) ?? 0)
       revenueETB += String(reg.currency ?? 'ETB') === 'ETB' ? amount : amount * 55 // approx. display normalization
     }
     const day = String(reg.created_at).slice(0, 10)

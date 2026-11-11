@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { listRegistrations, getDashboardStats, CATEGORY_OPTIONS, CATEGORY_LABELS, isOpenForRegistration } from '@/lib/registrations'
 import AdminShell from '../admin-shell'
 import { Badge, StatCard, card, primaryButton, ghostButton, money, formatDate } from './shared'
-import { bulkExperienceStatus } from './actions'
+import { bulkExperienceStatus, experienceRowAction } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -164,7 +164,9 @@ export default async function RegistrationsDashboard({
 
         {items.length ? (
           <>
-            <form action={bulkExperienceStatus}>
+            {/* Single bulk form containing table + bulk bar. Row menus submit to
+                this same form via button submitters, so nothing nests. */}
+            <form action={experienceRowAction} id="bulk-form">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[960px] border-collapse text-left text-sm">
                   <thead>
@@ -187,7 +189,7 @@ export default async function RegistrationsDashboard({
                       return (
                         <tr className="transition hover:bg-zinc-50" key={item.id}>
                           <td className="px-3">
-                            <input className="h-4 w-4 accent-emerald-700" name="ids" type="checkbox" value={item.id} form="bulk-form" />
+                            <input className="h-4 w-4 accent-emerald-700" name="ids" type="checkbox" value={item.id} />
                           </td>
                           <td className="max-w-64 px-4 py-3.5">
                             <Link className="block truncate font-semibold text-zinc-950 hover:text-emerald-800" href={`/admin/registrations/${item.id}`}>{item.title_en || '(untitled)'}</Link>
@@ -216,15 +218,11 @@ export default async function RegistrationsDashboard({
                                 <MenuItem href={`/admin/registrations/${item.id}/edit`}>Edit</MenuItem>
                                 <MenuItem href={`/register/${item.slug}`}>Preview public page</MenuItem>
                                 <MenuItem href={`/admin/registrations/${item.id}?tab=participants`}>Manage participants</MenuItem>
-                                <form action={duplicateFormAction(item.id)}>
-                                  <MenuButton>Duplicate</MenuButton>
-                                </form>
-                                <form action={statusFormAction(item.id, item.status === 'published' ? 'unpublished' : 'published')}>
-                                  <MenuButton>{item.status === 'published' ? 'Unpublish' : 'Publish'}</MenuButton>
-                                </form>
-                                <form action={statusFormAction(item.id, 'archived')}>
-                                  <MenuButton>Archive</MenuButton>
-                                </form>
+                                <RowActionButton id={item.id} intent="duplicate">Duplicate</RowActionButton>
+                                <RowActionButton id={item.id} intent={item.status === 'published' ? 'unpublish' : 'publish'}>
+                                  {item.status === 'published' ? 'Unpublish' : 'Publish'}
+                                </RowActionButton>
+                                <RowActionButton id={item.id} intent="archive">Archive</RowActionButton>
                               </div>
                             </details>
                           </td>
@@ -235,17 +233,13 @@ export default async function RegistrationsDashboard({
                 </table>
               </div>
 
-              {/* Bulk bar */}
+              {/* Bulk bar — inside the same form; each button declares its status. */}
               <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3" id="bulk-bar">
                 <span className="text-xs font-semibold text-zinc-600">With selected:</span>
-                <button className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50" type="submit">Publish</button>
-                <button className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100" form="bulk-form-unpublish" type="submit">Unpublish</button>
-                <button className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50" form="bulk-form-archive" type="submit">Archive</button>
+                <button className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50" name="status" type="submit" value="published">Publish</button>
+                <button className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100" name="status" type="submit" value="unpublished">Unpublish</button>
+                <button className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50" name="status" type="submit" value="archived">Archive</button>
               </div>
-              {/* Hidden alternate-status forms share the checkbox inputs via form attr */}
-              <form action={bulkExperienceStatus} id="bulk-form" />
-              <form action={bulkExperienceStatus} id="bulk-form-unpublish"><input type="hidden" name="status" value="unpublished" /></form>
-              <form action={bulkExperienceStatus} id="bulk-form-archive"><input type="hidden" name="status" value="archived" /></form>
             </form>
           </>
         ) : (
@@ -275,9 +269,17 @@ function MenuItem({ href, children }: { href: string; children: React.ReactNode 
     <a className="block rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100" href={href}>{children}</a>
   )
 }
-function MenuButton({ children }: { children: React.ReactNode }) {
+/** Submits to the surrounding bulk form, carrying intent:id via row_intent. */
+function RowActionButton({ id, intent, children }: { id: number; intent: 'duplicate' | 'publish' | 'unpublish' | 'archive'; children: React.ReactNode }) {
   return (
-    <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-zinc-700 hover:bg-zinc-100" type="submit">{children}</button>
+    <button
+      className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+      name="row_intent"
+      type="submit"
+      value={`${intent}:${id}`}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -288,22 +290,4 @@ function Banner({ tone, children }: { tone: 'green' | 'amber'; children: React.R
   return <p className={`mb-4 rounded-xl border px-4 py-3 text-sm font-medium ${styles}`}>{children}</p>
 }
 
-// Small helpers that build bound server-action forms inside the table row.
-import { duplicateExperience, setExperienceStatus } from './actions'
-function duplicateFormAction(id: number) {
-  return async function bound(_formData: FormData) {
-    'use server'
-    const data = new FormData()
-    data.set('id', String(id))
-    await duplicateExperience(data)
-  }
-}
-function statusFormAction(id: number, status: string) {
-  return async function bound(_formData: FormData) {
-    'use server'
-    const data = new FormData()
-    data.set('id', String(id))
-    data.set('status', status)
-    await setExperienceStatus(data)
-  }
-}
+

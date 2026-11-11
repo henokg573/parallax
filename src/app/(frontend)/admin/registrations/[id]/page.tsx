@@ -288,9 +288,26 @@ export default async function RegistrationDetailPage({
               </div>
               {participant.receipt_id && (
                 <div className="px-5">
-                  <a className={`${ghostButton} text-xs text-emerald-800`} href={`/api/admin/receipts/${participant.receipt_id}`} target="_blank" rel="noreferrer">
-                    Inspect payment proof ↗
-                  </a>
+                  <details className="group rounded-xl border border-zinc-200 bg-zinc-50">
+                    <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-semibold text-emerald-800">
+                      <span>Payment proof</span>
+                      <span className="text-xs font-medium text-zinc-500 group-open:hidden">Show ▾</span>
+                      <span className="hidden text-xs font-medium text-zinc-500 group-open:inline">Hide ▴</span>
+                    </summary>
+                    <div className="border-t border-zinc-200 p-4">
+                      <ReceiptPreview receiptID={participant.receipt_id} />
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <a className={`${ghostButton} text-xs`} href={`/api/admin/receipts/${participant.receipt_id}`} target="_blank" rel="noreferrer">
+                          Open full size ↗
+                        </a>
+                        {participant.receipt_id && (
+                          <a className={`${ghostButton} text-xs`} href={`/api/admin/receipts/${participant.receipt_id}?download=1`}>
+                            Download
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </details>
                 </div>
               )}
               <form action={verifyParticipant} className="grid gap-3 border-t border-zinc-100 bg-zinc-50 p-5 sm:grid-cols-[1fr_auto]">
@@ -419,6 +436,29 @@ function Row({ label, value }: { label: string; value: string }) {
       <dd className="mt-0.5 font-medium capitalize text-zinc-800">{value}</dd>
     </div>
   )
+}
+
+async function ReceiptPreview({ receiptID }: { receiptID: number }) {
+  let mimeType = ''
+  try {
+    const { rows } = await import('@/lib/db')
+    const receipts = await rows<{ mime_type: string }>('payment_receipts', {
+      select: 'mime_type', eq: { id: receiptID }, limit: 1,
+    })
+    mimeType = receipts[0]?.mime_type ?? ''
+  } catch {
+    mimeType = ''
+  }
+
+  if (!mimeType) {
+    return <p className="text-sm text-zinc-500">Receipt file is not available.</p>
+  }
+  const src = `/api/admin/receipts/${receiptID}`
+  if (mimeType === 'application/pdf') {
+    return <iframe className="h-96 w-full rounded-lg border border-zinc-200 bg-white" src={src} title="Payment receipt (PDF)" />
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img alt="Payment receipt upload" className="max-h-96 w-full rounded-lg border border-zinc-200 object-contain" src={src} />
 }
 function MiniStat({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
   return (

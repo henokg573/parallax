@@ -4,6 +4,19 @@
 -- The app now supports 12 registration categories. The legacy `kind` column is
 -- a restricted enum (experience_kind) that lacks the new values, so widen it to
 -- plain text first. Existing values are preserved.
+-- Also extend the publish-status enum so 'unpublished' is a legal value.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
+    WHERE t.typname = 'publish_status'
+  ) THEN
+    ALTER TYPE public.publish_status ADD VALUE IF NOT EXISTS 'unpublished';
+  END IF;
+END $$;
+
+-- Some deployments ship an 'unpublish' enum value variant; normalize those rows.
+UPDATE public.experiences SET status = 'unpublished' WHERE status::text = 'unpublish';
 ALTER TABLE public.experiences
   ALTER COLUMN kind DROP DEFAULT;
 
@@ -109,3 +122,71 @@ CREATE TABLE IF NOT EXISTS public.registration_activity (
 
 CREATE INDEX IF NOT EXISTS registration_activity_reg_idx
   ON public.registration_activity (registration_id);
+-- Store the price as the registration amount so dashboard revenue is accurate.
+CREATE OR REPLACE FUNCTION public.create_public_registration(
+  p_experience_id bigint,
+  p_filename text,
+  p_original_filename text,
+  p_mime_type text,
+  p_size_bytes bigint,
+  p_full_name text,
+  p_email text,
+  p_phone text,
+  p_preferred_channel text,
+  p_payment_reference text,
+  p_check_in_token text
+)
+RETURNS bigint
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE
+  selected_capacity integer;
+  receipt_id bigint;
+  registration_id bigint;
+  registration_price numeric(10,2);
+  registration_currency text;
+BEGIN
+  SELECT capacity, price, currency INTO selected_capacity, registration_price, registration_currency
+  FROM public.experiences
+  WHERE id = p_experience_id AND status = 'published';
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Experience is not open for registration.';
+  END IF;
+
+  IF selected_capacity IS NOT NULL AND (
+    SELECT count(*) FROM public.registrations
+    WHERE experience_id = p_experience_id AND payment_status <> 'rejected'
+  ) >= selected_capacity THEN
+    RAISE EXCEPTION 'Experience capacity has been reached.';
+  END IF;
+
+  INSERT INTO public.payment_receipts (
+    filename, original_filename, mime_type, size_bytes
+  ) VALUES (
+    p_filename, p_original_filename, p_mime_type, p_size_bytes
+  ) RETURNING id INTO receipt_id;
+
+  INSERT INTO public.registrations (
+    experience_id, receipt_id, full_name, email, phone,
+    preferred_channel, payment_reference, check_in_token,
+    amount, currency
+  ) VALUES (
+    p_experience_id, receipt_id, p_full_name, p_email, p_phone,
+    p_preferred_channel, p_payment_reference, p_check_in_token::uuid,
+    COALESCE(registration_price, 0), COALESCE(registration_currency, 'ETB')
+  ) RETURNING id INTO registration_id;
+
+  RETURN registration_id;
+END;
+$fn$;
+
+REVOKE ALL ON FUNCTION public.create_public_registration(
+  bigint, text, text, text, bigint, text, text, text, text, text, text
+) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.create_public_registration(
+  bigint, text, text, text, bigint, text, text, text, text, text, text
+) TO anon, authenticated;

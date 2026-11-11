@@ -34,6 +34,28 @@ function jsonList(formData: FormData, key: string): unknown[] {
   }
 }
 
+function positiveID(raw: string): number | null {
+  const id = Number(raw)
+  return Number.isSafeInteger(id) && id > 0 ? id : null
+}
+
+/**
+ * Updates an experience status, gracefully mapping 'unpublished' to 'draft'
+ * when the database's publish_status enum predates that value.
+ */
+async function updateExperienceStatus(id: number, requestedStatus: string) {
+  try {
+    await update('experiences', { status: requestedStatus, updated_at: new Date().toISOString() }, { id })
+  } catch (error) {
+    const message = String(error)
+    if (requestedStatus === 'unpublished' && message.includes('unpublished')) {
+      await update('experiences', { status: 'draft', updated_at: new Date().toISOString() }, { id })
+      return
+    }
+    throw error
+  }
+}
+
 function numberList(formData: FormData, key: string): number[] {
   return formData.getAll(key)
     .filter((entry): entry is string => typeof entry === 'string')
@@ -325,13 +347,68 @@ export async function setExperienceStatus(formData: FormData) {
   redirect(value(formData, 'return_to', 300) || '/admin/registrations?saved=1')
 }
 
+/**
+ * Handles every action initiated from the registrations table: row intents
+ * (duplicate/publish/unpublish/archive) encoded as "intent:id", and bulk
+ * status changes where checked ids travel with the submission.
+ */
+export async function experienceRowAction(formData: FormData) {
+  const admin = await requireContentAdmin()
+
+  const rowIntent = value(formData, 'row_intent', 40)
+  if (rowIntent) {
+    const separatorIndex = rowIntent.lastIndexOf(':')
+    const intent = rowIntent.slice(0, separatorIndex)
+    const rowID = positiveID(rowIntent.slice(separatorIndex + 1))
+    if (!rowID) throw new Error('Invalid row action.')
+
+    switch (intent) {
+      case 'duplicate': {
+        const source = await rows<Record<string, unknown>>('experiences', { select: '*', eq: { id: rowID }, limit: 1 })
+        const original = source[0]
+        if (!original) throw new Error('Registration not found.')
+        const { id: unusedID, created_at: unusedCreated, ...rest } = original
+        const created = await insert<{ id: number }>('experiences', {
+          ...rest,
+          title_en: `${String(original.title_en)} (copy)`,
+          slug: `${String(original.slug)}-${Date.now().toString(36)}`.slice(0, 180),
+          status: 'draft',
+          updated_at: new Date().toISOString(),
+        })
+        await logActivity('experience-duplicated', String(original.title_en), undefined, created.id)
+        revalidatePath('/admin/registrations')
+        redirect('/admin/registrations?saved=1')
+        return
+      }
+      case 'publish':
+      case 'unpublish':
+      case 'archive': {
+        const requestedStatus = intent === 'archive' ? 'archived' : intent === 'publish' ? 'published' : 'unpublished'
+        await updateExperienceStatus(rowID, requestedStatus)
+        await logActivity(`experience-${requestedStatus}`, '', undefined, rowID)
+        revalidatePath('/admin/registrations')
+        redirect(`/admin/registrations?${requestedStatus === 'archived' ? 'archived' : 'saved'}=1`)
+        return
+      }
+      default:
+        throw new Error('Unknown row action.')
+    }
+  }
+
+  // Fall through to the bulk status flow when no row intent was present.
+  await bulkExperienceStatus(formData)
+  redirect('/admin/registrations?bulk=1')
+}
+
 export async function bulkExperienceStatus(formData: FormData) {
   const admin = await requireContentAdmin()
   const ids = numberList(formData, 'ids')
   const status = value(formData, 'status', 20)
-  if (!ids.length || !REGISTRATION_STATUS_VALUES.includes(status as never)) throw new Error('Invalid bulk action.')
+  if (!ids.length || !REGISTRATION_STATUS_VALUES.includes(status as never)) {
+    throw new Error('Select at least one registration, then choose Publish, Unpublish, or Archive.')
+  }
   for (const id of ids) {
-    await update('experiences', { status, updated_at: new Date().toISOString() }, { id })
+    await updateExperienceStatus(id, status)
   }
   await logActivity(`experience-bulk-${status}`, `${ids.length} items`)
   revalidatePath('/admin/registrations')

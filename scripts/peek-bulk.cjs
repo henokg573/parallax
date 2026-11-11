@@ -1,0 +1,5 @@
+const fs = require('fs')
+const s = fs.readFileSync('src/app/(frontend)/admin/registrations/page.tsx', 'utf8')
+const a = s.indexOf('<div className="overflow-x-auto">')
+const b = s.indexOf('Hidden bulk forms')
+console.log(s.slice(a, b + 900))
