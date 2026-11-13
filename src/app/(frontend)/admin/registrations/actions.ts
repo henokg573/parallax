@@ -8,7 +8,7 @@ import { getAdminSession } from '@/lib/admin-auth'
 import { insert, rows, update } from '@/lib/db'
 import { PUBLIC_MEDIA_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
 import { REGISTRATION_STATUS_VALUES } from '@/lib/registrations'
-import { sendRegistrationNotification } from '@/lib/telegram'
+import { sendRegistrationNotification, sendVerifiedRegistrationTicketEmail } from '@/lib/telegram'
 
 function value(formData: FormData, key: string, max: number) {
   const field = formData.get(key)
@@ -520,41 +520,81 @@ export async function verifyParticipant(formData: FormData) {
     : { ok: true as const }
 
   // Ticket QR email on first verification (reuses Resend integration).
-  let emailFailed = false
+  let emailFailure: 'not_configured' | 'request_failed' | 'rejected' | null = null
   if (decision === 'verified' && !registration.ticket_email_sent_at) {
-    const apiKey = process.env.RESEND_API_KEY
-    const from = process.env.PARALLAX_FROM_EMAIL
-    const siteURL = process.env.NEXT_PUBLIC_SITE_URL
-    if (!apiKey || !from) {
-      emailFailed = true
+    const result = await sendVerifiedRegistrationTicketEmail({
+      to: registration.email,
+      fullName: registration.full_name,
+      experienceTitle: experienceRows[0]?.title_en || `Experience ${registration.experience_id}`,
+      registrationID: registration.id,
+      checkInToken: registration.check_in_token,
+    })
+    if (result.ok) {
+      await update('registrations', { ticket_email_sent_at: new Date().toISOString() }, { id, ticket_email_sent_at: null })
     } else {
-      const checkInURL = `${siteURL || 'http://localhost:3000'}/check-in/${registration.check_in_token}`
-      const qrDataURL = await QRCode.toDataURL(checkInURL, { errorCorrectionLevel: 'H', margin: 2, width: 720 })
-      try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from,
-            to: [registration.email],
-            subject: 'Your Parallax entry QR code',
-            html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#102e26"><p style="font-size:12px;color:#9a6b20">PARALLAX · PAYMENT VERIFIED</p><h1>You are on the list.</h1><p>Your payment has been verified. Your entry QR code is attached. Keep it ready when you arrive.</p></div>`,
-            attachments: [{ filename: 'parallax-entry-qr.png', content: qrDataURL.split(',')[1] }],
-          }),
-        })
-        if (response.ok) {
-          await update('registrations', { ticket_email_sent_at: new Date().toISOString() }, { id, ticket_email_sent_at: null })
-        } else {
-          emailFailed = true
-        }
-      } catch {
-        emailFailed = true
-      }
+      emailFailure = result.reason
     }
   }
 
   revalidatePath(`/admin/registrations/${experienceID}`)
-  redirect(`/admin/registrations/${experienceID}?verified=${decision}${emailFailed ? '&email=failed' : ''}${!notification.ok ? '&telegram=failed' : ''}`)
+  const telegramFailure = notification.ok ? null : notification.reason
+  redirect(`/admin/registrations/${experienceID}?verified=${decision}${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}`)
+}
+
+export async function retryRegistrationNotifications(formData: FormData) {
+  const admin = await getAdminSession()
+  if (!admin) redirect('/admin/login')
+  if (admin.role === 'check-in') redirect('/admin')
+
+  const id = Number(value(formData, 'id', 20))
+  if (!Number.isSafeInteger(id) || id < 1) throw new Error('Invalid registration.')
+
+  const existing = await rows<VerifyRow>('registrations', {
+    select: 'id, experience_id, payment_status, full_name, email, phone, preferred_channel, payment_reference, check_in_token, ticket_email_sent_at',
+    eq: { id },
+    limit: 1,
+  })
+  const registration = existing[0]
+  if (!registration || registration.payment_status !== 'verified') {
+    throw new Error('Only verified registrations can retry notifications.')
+  }
+
+  const experienceRows = await rows<{ title_en: string }>('experiences', {
+    select: 'title_en',
+    eq: { id: registration.experience_id },
+    limit: 1,
+  })
+  const experienceTitle = experienceRows[0]?.title_en || `Experience ${registration.experience_id}`
+  const notification = await sendRegistrationNotification({
+    id: registration.id,
+    experienceTitle,
+    fullName: registration.full_name,
+    email: registration.email,
+    phone: registration.phone,
+    preferredChannel: registration.preferred_channel,
+    paymentReference: registration.payment_reference,
+  }, 'verified')
+
+  let emailFailure: 'not_configured' | 'request_failed' | 'rejected' | null = null
+  if (!registration.ticket_email_sent_at) {
+    const result = await sendVerifiedRegistrationTicketEmail({
+      to: registration.email,
+      fullName: registration.full_name,
+      experienceTitle,
+      registrationID: registration.id,
+      checkInToken: registration.check_in_token,
+    })
+    if (result.ok) {
+      await update('registrations', { ticket_email_sent_at: new Date().toISOString() }, { id, ticket_email_sent_at: null })
+    } else {
+      emailFailure = result.reason
+    }
+  }
+
+  await logActivity('notification-retry', '', id)
+  revalidatePath(`/admin/registrations/${registration.experience_id}`)
+  const telegramFailure = notification.ok ? null : notification.reason
+  redirect(`/admin/registrations/${registration.experience_id}?retried=1${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}`)
 }
 
 export async function bulkVerifyParticipants(formData: FormData) {

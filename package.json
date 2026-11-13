@@ -12,6 +12,9 @@
     "format": "oxfmt"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0",
     "@supabase/server": "^1.9.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
@@ -25,6 +28,7 @@
     "sharp": "^0.35.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "24.12.3",
     "@types/qrcode": "^1.5.6",

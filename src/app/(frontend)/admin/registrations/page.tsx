@@ -56,7 +56,12 @@ export default async function RegistrationsDashboard({
       {query.saved && <Banner tone="green">Changes saved.</Banner>}
       {query.published && <Banner tone="green">Registration published successfully.</Banner>}
       {query.bulk && <Banner tone="green">Bulk update applied.</Banner>}
-      {query.telegram === 'failed' && <Banner tone="amber">The registration change was saved, but its Telegram notification failed. Check the Telegram configuration on account settings.</Banner>}
+      {query.telegram === 'not_configured' && <Banner tone="amber">Registration saved, but Telegram is not configured. Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to the server environment, then redeploy.</Banner>}
+      {(query.telegram === 'failed' || query.telegram === 'rejected') && <Banner tone="amber">Registration saved, but Telegram rejected the notification. Check the bot token, chat ID, and bot access in account settings.</Banner>}
+      {query.telegram === 'request_failed' && <Banner tone="amber">Registration saved, but the Telegram service could not be reached. Check the server logs and try again.</Banner>}
+      {query.email === 'not_configured' && <Banner tone="amber">Payment was approved, but ticket email settings are missing. Configure RESEND_API_KEY and PARALLAX_FROM_EMAIL on the server.</Banner>}
+      {(query.email === 'failed' || query.email === 'rejected') && <Banner tone="amber">Payment was approved, but Resend rejected the ticket email. Check Resend Logs for the provider's reason.</Banner>}
+      {query.email === 'request_failed' && <Banner tone="amber">Payment was approved, but the ticket email request failed. Check the server logs and retry.</Banner>}
       {query.archived && <Banner tone="amber">Registration archived.</Banner>}
       {query.denied && <Banner tone="amber">Only a super admin can permanently delete registrations.</Banner>}
 

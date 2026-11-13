@@ -14,7 +14,12 @@ import {
 } from '@/lib/admin-auth'
 import { insert, remove, rows, update } from '@/lib/db'
 import { PUBLIC_MEDIA_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
-import { isTelegramConfigured, sendRegistrationNotification, sendTelegramMessage } from '@/lib/telegram'
+import {
+  isTelegramConfigured,
+  sendRegistrationNotification,
+  sendTelegramMessage,
+  sendVerifiedRegistrationTicketEmail,
+} from '@/lib/telegram'
 
 function value(formData: FormData, key: string, maxLength: number) {
   const field = formData.get(key)
@@ -629,7 +634,7 @@ export async function updateRegistration(formData: FormData) {
     : []
   await update('registrations', { payment_status: status, internal_notes: internalNotes }, { id })
 
-  let telegramFailed = false
+  let telegramFailure: 'not_configured' | 'request_failed' | 'rejected' | null = null
   if (status !== registration.payment_status && status !== 'pending') {
     const notification = await sendRegistrationNotification({
       id: registration.id,
@@ -640,42 +645,26 @@ export async function updateRegistration(formData: FormData) {
       preferredChannel: registration.preferred_channel,
       paymentReference: registration.payment_reference,
     }, status as 'verified' | 'rejected')
-    telegramFailed = !notification.ok
+    telegramFailure = notification.ok ? null : notification.reason
   }
 
-  let emailFailed = false
+  let emailFailure: 'not_configured' | 'request_failed' | 'rejected' | null = null
   if (status === 'verified' && registration && !registration.ticket_email_sent_at) {
-    const apiKey = process.env.RESEND_API_KEY
-    const from = process.env.PARALLAX_FROM_EMAIL
-    if (!apiKey || !from) {
-      emailFailed = true
+    const result = await sendVerifiedRegistrationTicketEmail({
+      to: registration.email,
+      fullName: registration.full_name,
+      experienceTitle: experienceRows[0]?.title_en || `Experience ${registration.experience_id}`,
+      registrationID: registration.id,
+      checkInToken: registration.check_in_token,
+    })
+    if (result.ok) {
+      await update('registrations', { ticket_email_sent_at: new Date().toISOString() }, { id, ticket_email_sent_at: null })
     } else {
-      const checkInURL = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/check-in/${registration.check_in_token}`
-      const qrDataURL = await QRCode.toDataURL(checkInURL, { errorCorrectionLevel: 'H', margin: 2, width: 720 })
-      try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from,
-            to: [registration.email],
-            subject: 'Your Parallax entry QR code',
-            html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#102e26"><p style="font-size:12px;color:#9a6b20">PARALLAX · PAYMENT VERIFIED</p><h1>You are on the list, ${registration.full_name.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')}.</h1><p>Your payment has been verified. Your entry QR code is attached. Keep it ready when you arrive.</p></div>`,
-            attachments: [{ filename: 'parallax-entry-qr.png', content: qrDataURL.split(',')[1] }],
-          }),
-        })
-        if (response.ok) {
-          await update('registrations', { ticket_email_sent_at: new Date().toISOString() }, { id, ticket_email_sent_at: null })
-        } else {
-          emailFailed = true
-        }
-      } catch {
-        emailFailed = true
-      }
+      emailFailure = result.reason
     }
   }
 
-  redirect(`/admin/registrations?saved=1${emailFailed ? '&email=failed' : ''}${telegramFailed ? '&telegram=failed' : ''}`)
+  redirect(`/admin/registrations?saved=1${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}`)
 }
 
 export async function createAdmin(formData: FormData) {

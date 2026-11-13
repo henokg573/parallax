@@ -458,9 +458,19 @@ export default async function AdminSectionPage({
           Item restored as a draft. Publish it again when it is ready.
         </p>
       )}
-      {query.email === 'failed' && (
+      {query.email === 'not_configured' && (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
-          Payment was approved, but the ticket email was not sent. The QR below is ready to scan; configure Resend to send tickets by email.
+          Payment was approved, but ticket email settings are missing. The QR below is ready to scan; configure RESEND_API_KEY and PARALLAX_FROM_EMAIL on the server.
+        </p>
+      )}
+      {(query.email === 'failed' || query.email === 'rejected') && (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
+          Payment was approved, but Resend rejected the ticket email. The QR below is ready to scan; check Resend Logs for the provider's reason.
+        </p>
+      )}
+      {query.email === 'request_failed' && (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
+          Payment was approved, but the ticket email request failed. The QR below is ready to scan; check server logs and retry.
         </p>
       )}
       {query.error === 'schema' && (

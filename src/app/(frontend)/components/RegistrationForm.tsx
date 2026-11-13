@@ -52,6 +52,9 @@ export function RegistrationForm({
         {state.notificationWarning && (
           <p className="form-message" role="status">{state.notificationWarning}</p>
         )}
+        {state.emailWarning && (
+          <p className="form-message" role="status">{state.emailWarning}</p>
+        )}
       </div>
     )
   }

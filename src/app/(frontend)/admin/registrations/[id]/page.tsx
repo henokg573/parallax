@@ -6,7 +6,7 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { getExperienceFull, listParticipants, CATEGORY_LABELS } from '@/lib/registrations'
 import AdminShell from '../../admin-shell'
 import { Badge, card, primaryButton, ghostButton, dangerButton, inputClass, fieldLabel, money, formatDate } from '../shared'
-import { setExperienceStatus, duplicateExperience, deleteExperience, verifyParticipant, bulkVerifyParticipants, updateParticipant, manualCheckIn } from '../actions'
+import { setExperienceStatus, duplicateExperience, deleteExperience, verifyParticipant, retryRegistrationNotifications, bulkVerifyParticipants, updateParticipant, manualCheckIn } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,10 +87,15 @@ export default async function RegistrationDetailPage({
 
       {query.saved && <Banner tone="green">Changes saved.</Banner>}
       {query.bulk && <Banner tone="green">Bulk verification applied.</Banner>}
-      {query.verified === 'verified' && <Banner tone="green">Payment verified and ticket emailed.</Banner>}
+      {query.retried && !query.email && !query.telegram && <Banner tone="green">Notification retry completed successfully.</Banner>}
+      {query.verified === 'verified' && !query.email && <Banner tone="green">Payment verified and ticket emailed.</Banner>}
       {query.verified === 'rejected' && <Banner tone="amber">Payment rejected.</Banner>}
-      {query.telegram === 'failed' && <Banner tone="amber">The registration was saved, but its Telegram notification failed. Check the Telegram configuration on account settings.</Banner>}
-      {query.email === 'failed' && <Banner tone="amber">Verified, but the ticket email could not be sent. Configure Resend to enable automatic emails.</Banner>}
+      {query.telegram === 'not_configured' && <Banner tone="amber">Registration saved, but Telegram is not configured. Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to the server environment, then redeploy.</Banner>}
+      {(query.telegram === 'failed' || query.telegram === 'rejected') && <Banner tone="amber">Registration saved, but Telegram rejected the notification. Check the bot token, chat ID, and bot access in account settings.</Banner>}
+      {query.telegram === 'request_failed' && <Banner tone="amber">Registration saved, but the Telegram service could not be reached. Check the server logs and try again.</Banner>}
+      {query.email === 'not_configured' && <Banner tone="amber">Verified, but ticket email settings are missing. Configure RESEND_API_KEY and PARALLAX_FROM_EMAIL on the server.</Banner>}
+      {(query.email === 'failed' || query.email === 'rejected') && <Banner tone="amber">Verified, but Resend rejected the ticket email. Check Resend Logs for the provider's reason.</Banner>}
+      {query.email === 'request_failed' && <Banner tone="amber">Verified, but the ticket email request failed. Check the server logs and retry verification to send it again.</Banner>}
       {query.checkin === 'success' && <Banner tone="green">✓ Checked in: {query.who}</Banner>}
       {query.checkin === 'duplicate' && <Banner tone="amber">Already checked in: {query.who}. Duplicate check-ins are prevented.</Banner>}
       {query.checkin === 'unverified' && <Banner tone="amber">Payment is not verified for {query.who}. Only super admins can override.</Banner>}
@@ -334,6 +339,12 @@ export default async function RegistrationDetailPage({
                     <span className="text-xs text-zinc-500">{participant.verified_by ?? '—'} · {formatDate(participant.verified_at)}</span>
                     <Badge value={participant.payment_status} />
                     {participant.verification_notes && <span className="basis-full text-xs text-zinc-500">📝 {participant.verification_notes}</span>}
+                    {participant.payment_status === 'verified' && admin.role !== 'check-in' && (
+                      <form action={retryRegistrationNotifications}>
+                        <input type="hidden" name="id" value={participant.id} />
+                        <button className={`${ghostButton} text-xs`} type="submit">Retry notifications</button>
+                      </form>
+                    )}
                   </li>
                 ))}
               </ul>

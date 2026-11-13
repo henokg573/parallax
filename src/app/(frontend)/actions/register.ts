@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { publicRpc, publicRows } from '@/lib/db'
 import { PRIVATE_RECEIPTS_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
 import {
+  isResendConfigured,
+  sendRegistrationConfirmationEmail,
   sendRegistrationNotification,
   sendRegistrationReceiptNotification,
 } from '@/lib/telegram'
@@ -13,6 +15,7 @@ export type RegistrationState = {
   message: string
   errors?: Record<string, string>
   notificationWarning?: string
+  emailWarning?: string
 }
 
 function text(formData: FormData, name: string, max: number): string {
@@ -31,6 +34,7 @@ const messages = {
     check: 'Please check the highlighted fields.',
     success: 'Registration received. We will email your QR ticket after payment verification.',
     notificationWarning: 'The registration was saved, but the team notification could not be delivered. Please contact Parallax if you need help.',
+    emailWarning: 'The registration was saved, but the confirmation email could not be sent. Please contact Parallax if you need help.',
     failure: 'We could not submit this registration. The experience may no longer be open.',
   },
   am: {
@@ -43,6 +47,7 @@ const messages = {
     check: 'ምልክት የተደረገባቸውን መስኮች ያረጋግጡ።',
     success: 'ምዝገባዎ ደርሷል። ክፍያው ከተረጋገጠ በኋላ የQR ትኬትዎን በኢሜይል እንልካለን።',
     notificationWarning: 'ምዝገባው ተቀምጧል፣ ግን የቡድን ማሳወቂያው አልደረሰም። እርዳታ ከፈለጉ Parallaxን ያነጋግሩ።',
+    emailWarning: 'ምዝገባው ተቀምጧል፣ ግን የማረጋገጫ ኢሜይሉ አልተላከም። እርዳታ ከፈለጉ Parallaxን ያነጋግሩ።',
     failure: 'ምዝገባውን ማስገባት አልቻልንም። ዝግጅቱ ለምዝገባ ዝግ ሊሆን ይችላል።',
   },
 } as const
@@ -139,6 +144,7 @@ export async function registerForExperience(
     })
 
     let notificationFailed = false
+    let emailFailed = false
     try {
       const experiences = await publicRows<{ title_en: string }>('experiences', {
         select: 'title_en',
@@ -163,6 +169,20 @@ export async function registerForExperience(
         }),
       ])
       notificationFailed = !notification.ok || !receiptNotification.ok
+
+      // Confirmation email to the registrant via Resend.
+      if (isResendConfigured()) {
+        const confirmationEmail = await sendRegistrationConfirmationEmail({
+          to: registration.email,
+          fullName,
+          experienceTitle: registration.experienceTitle,
+          experienceID: experience,
+          registrationID: registration.id,
+        })
+        emailFailed = !confirmationEmail.ok
+      } else {
+        emailFailed = true
+      }
     } catch (error) {
       notificationFailed = true
       console.error('[telegram] New registration notification could not be prepared.', error)
@@ -172,6 +192,7 @@ export async function registerForExperience(
       success: true,
       message: copy.success,
       notificationWarning: notificationFailed ? copy.notificationWarning : undefined,
+      emailWarning: emailFailed ? copy.emailWarning : undefined,
     }
   } catch (error) {
     if (receiptStoragePath) await removeStorageFile(PRIVATE_RECEIPTS_BUCKET, receiptStoragePath).catch(() => undefined)
