@@ -4,6 +4,7 @@ import { listRegistrations, getDashboardStats, CATEGORY_OPTIONS, CATEGORY_LABELS
 import AdminShell from '../admin-shell'
 import { Badge, StatCard, card, primaryButton, ghostButton, money, formatDate } from './shared'
 import { bulkExperienceStatus, experienceRowAction } from './actions'
+import { registrationTitleText } from '@/lib/registration-title'
 
 export const dynamic = 'force-dynamic'
 
@@ -198,7 +199,7 @@ export default async function RegistrationsDashboard({
                             <input className="h-4 w-4 accent-emerald-700" name="ids" type="checkbox" value={item.id} />
                           </td>
                           <td className="max-w-64 px-4 py-3.5">
-                            <Link className="block truncate font-semibold text-zinc-950 hover:text-emerald-800" href={`/admin/registrations/${item.id}`}>{item.title_en || '(untitled)'}</Link>
+                            <Link className="block truncate font-semibold text-zinc-950 hover:text-emerald-800" href={`/admin/registrations/${item.id}`}>{registrationTitleText(item.title_en) || '(untitled)'}</Link>
                             <span className="block truncate text-xs text-zinc-500">/{item.slug} · created {formatDate(item.created_at).split(',')[0]}</span>
                           </td>
                           <td className="px-4 py-3.5"><span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-700">{CATEGORY_LABELS[item.kind] ?? item.kind}</span></td>

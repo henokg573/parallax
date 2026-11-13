@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { PublicHomeContent, PublicMedia, PublicVideo } from '@/lib/public-content'
+import { registrationTitleText } from '@/lib/registration-title'
 import { InstallAppButton } from './InstallAppButton'
 
 type IconName =
@@ -738,7 +739,7 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                     <div className="event-info">
                       <p>{event.location}</p>
                       <h3>{event.title}</h3>
-                      <p className="event-summary">{event.summary}</p>
+                      <p className="event-summary">{registrationTitleText(event.summary)}</p>
                       <div>
                         <span>
                           {event.price

@@ -4,6 +4,7 @@ import { logoutAdmin } from './actions'
 import { requireAdmin } from '@/lib/admin-auth'
 import { rows } from '@/lib/db'
 import AdminShell, { roleLabel } from './admin-shell'
+import { registrationTitleText } from '@/lib/registration-title'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,7 +55,7 @@ export default async function AdminHomePage() {
         in: { id: pendingExperienceIDs },
       })
     : []
-  const experienceTitles = new Map(pendingExperiences.map((item) => [item.id, item.title_en]))
+  const experienceTitles = new Map(pendingExperiences.map((item) => [item.id, registrationTitleText(item.title_en)]))
   const recentPending: PendingRow[] = pendingRegistrations.map((item) => ({
     ...item,
     experience_title: experienceTitles.get(item.experience_id) || 'Parallax experience',
@@ -101,7 +102,7 @@ export default async function AdminHomePage() {
           </h2>
           {upcomingExperience ? (
             <div className="mt-4">
-              <p className="text-xl font-bold text-zinc-950">{upcomingExperience.title_en}</p>
+              <p className="text-xl font-bold text-zinc-950">{registrationTitleText(upcomingExperience.title_en)}</p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold capitalize text-zinc-700">{upcomingExperience.kind}</span>
                 <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-700">

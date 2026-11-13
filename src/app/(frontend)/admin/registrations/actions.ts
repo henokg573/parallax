@@ -9,6 +9,7 @@ import { insert, rows, update } from '@/lib/db'
 import { PUBLIC_MEDIA_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
 import { REGISTRATION_STATUS_VALUES } from '@/lib/registrations'
 import { sendRegistrationNotification, sendVerifiedRegistrationTicketEmail } from '@/lib/telegram'
+import { registrationTitleText } from '@/lib/registration-title'
 
 function value(formData: FormData, key: string, max: number) {
   const field = formData.get(key)
@@ -180,11 +181,47 @@ export async function saveRegistrationDraft(formData: FormData): Promise<SaveReg
   const idRaw = pick('id', '')
   const id = idRaw ? Number(idRaw) : null
   const titleEN = pick('title_en')
-  if (!titleEN) {
+  if (!registrationTitleText(titleEN)) {
     return { ok: false, error: 'validation', message: 'The English title is required.' }
   }
 
-  const slug = slugify(pick('slug') || titleEN) || `registration-${Date.now()}`
+  const summaryEN = pick('summary_en')
+  if (!registrationTitleText(summaryEN)) {
+    return { ok: false, error: 'validation', message: 'The English short description is required.' }
+  }
+  if (Array.from(summaryEN).length > 10000) {
+    return { ok: false, error: 'validation', message: 'The English short description must be 10,000 characters or fewer.' }
+  }
+
+  const limitedFields = [
+    ['location_en', 'English location name'],
+    ['location_am', 'Amharic location name'],
+  ] as const
+  for (const [key, label] of limitedFields) {
+    const fieldValue = pick(key)
+    if (/<\/?[a-z][\w-]*(?:\s|\/|>|$)/i.test(fieldValue)) {
+      return {
+        ok: false,
+        error: 'validation',
+        message: `${label} must be plain text. Put HTML or Markdown in the full description.`,
+      }
+    }
+    if (Array.from(fieldValue).length > 200) {
+      return {
+        ok: false,
+        error: 'validation',
+        message: `${label} must be 200 characters or fewer. Put longer formatted content in the full description.`,
+      }
+    }
+  }
+
+  for (const [key, label] of [['title_en', 'English registration header'], ['title_am', 'Amharic registration header']] as const) {
+    if (Array.from(pick(key)).length > 10000) {
+      return { ok: false, error: 'validation', message: `${label} must be 10,000 characters or fewer.` }
+    }
+  }
+
+  const slug = slugify(pick('slug') || registrationTitleText(titleEN)) || `registration-${Date.now()}`
   const kindRaw = pick('kind', 'event')
   const pricingMode = pick('pricing_mode', 'free')
   const statusRaw = pick('status', 'draft')
@@ -216,7 +253,7 @@ export async function saveRegistrationDraft(formData: FormData): Promise<SaveReg
     title_en: titleEN,
     title_am: pick('title_am'),
     kind: kindRaw || 'event',
-    summary_en: pick('summary_en'),
+    summary_en: summaryEN,
     summary_am: pick('summary_am'),
     description_en: pick('description_en'),
     description_am: pick('description_am'),
@@ -510,7 +547,7 @@ export async function verifyParticipant(formData: FormData) {
   const notification = decision !== registration.payment_status && decision !== 'pending'
     ? await sendRegistrationNotification({
         id: registration.id,
-        experienceTitle: experienceRows[0]?.title_en || `Experience ${registration.experience_id}`,
+        experienceTitle: registrationTitleText(experienceRows[0]?.title_en || '') || `Experience ${registration.experience_id}`,
         fullName: registration.full_name,
         email: registration.email,
         phone: registration.phone,
@@ -525,7 +562,7 @@ export async function verifyParticipant(formData: FormData) {
     const result = await sendVerifiedRegistrationTicketEmail({
       to: registration.email,
       fullName: registration.full_name,
-      experienceTitle: experienceRows[0]?.title_en || `Experience ${registration.experience_id}`,
+      experienceTitle: registrationTitleText(experienceRows[0]?.title_en || '') || `Experience ${registration.experience_id}`,
       registrationID: registration.id,
       checkInToken: registration.check_in_token,
     })
@@ -564,7 +601,7 @@ export async function retryRegistrationNotifications(formData: FormData) {
     eq: { id: registration.experience_id },
     limit: 1,
   })
-  const experienceTitle = experienceRows[0]?.title_en || `Experience ${registration.experience_id}`
+  const experienceTitle = registrationTitleText(experienceRows[0]?.title_en || '') || `Experience ${registration.experience_id}`
   const notification = await sendRegistrationNotification({
     id: registration.id,
     experienceTitle,
@@ -633,7 +670,7 @@ export async function bulkVerifyParticipants(formData: FormData) {
     if (registration && registration.payment_status !== decision) {
       const notification = await sendRegistrationNotification({
         id: registration.id,
-        experienceTitle: experienceTitles.get(registration.experience_id) || `Experience ${registration.experience_id}`,
+        experienceTitle: registrationTitleText(experienceTitles.get(registration.experience_id) || '') || `Experience ${registration.experience_id}`,
         fullName: registration.full_name,
         email: registration.email,
         phone: registration.phone,

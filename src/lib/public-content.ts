@@ -1,5 +1,6 @@
 import { rows } from '@/lib/db'
 import { publicMediaURL } from '@/lib/storage'
+import { registrationTitleText } from '@/lib/registration-title'
 
 export type PublicMedia = {
   url: string
@@ -192,7 +193,7 @@ export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicH
   return {
     experiences: experiences.map((item) => ({
       id: item.id,
-      title: title(item.title_en, item.title_am),
+      title: registrationTitleText(title(item.title_en, item.title_am)),
       kind: item.kind,
       summary: title(item.summary_en, item.summary_am),
       location: title(item.location_en, item.location_am),
@@ -204,7 +205,7 @@ export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicH
       registrationURL: item.registration_url,
       image: mediaValue(mediaByID.get(item.image_id ?? -1)) || (item.image_url ? {
         url: item.image_url,
-        alt: item.title_en,
+        alt: registrationTitleText(item.title_en),
         width: 1600,
         height: 1000,
       } : null),

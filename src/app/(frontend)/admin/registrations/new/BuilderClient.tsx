@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { saveRegistrationDraft, type SaveRegistrationResult } from '../actions'
 import { CATEGORY_OPTIONS, CATEGORY_LABELS, FIELD_TYPES } from '@/lib/registration-constants'
+import { registrationTitleText } from '@/lib/registration-title'
+import { ExperienceDescription } from '@/app/(frontend)/components/ExperienceDescription'
 import { inputClass, primaryButton, ghostButton, fieldLabel } from '../shared'
 
 type Ticket = {
@@ -41,7 +43,7 @@ function toLocalInput(value: string) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-function RichText({ value, onChange, name }: { value: string; onChange: (next: string) => void; name: string }) {
+function RichText({ value, onChange, name, dir, maxLength }: { value: string; onChange: (next: string) => void; name: string; dir?: 'auto'; maxLength?: number }) {
   const wrap = (prefix: string, suffix = prefix) => {
     onChange(`${value}\n${prefix}text${suffix}`)
   }
@@ -49,6 +51,7 @@ function RichText({ value, onChange, name }: { value: string; onChange: (next: s
     <div className="mt-1.5 rounded-xl border border-zinc-300 bg-white shadow-sm focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
       <div className="flex flex-wrap gap-1 border-b border-zinc-100 px-2 py-1.5">
         {([
+          ['H1', () => wrap('<h1>', '</h1>')],
           ['H2', () => wrap('<h2>', '</h2>')],
           ['¶', () => wrap('<p>', '</p>')],
           ['B', () => wrap('<strong>', '</strong>')],
@@ -60,7 +63,7 @@ function RichText({ value, onChange, name }: { value: string; onChange: (next: s
           </button>
         ))}
       </div>
-      <textarea className="min-h-36 w-full resize-y rounded-b-xl border-0 px-3 py-2.5 text-sm outline-none" name={name} onChange={(event) => onChange(event.target.value)} value={value} />
+      <textarea className="min-h-36 w-full resize-y rounded-b-xl border-0 px-3 py-2.5 text-sm outline-none" dir={dir} maxLength={maxLength} name={name} onChange={(event) => onChange(event.target.value)} value={value} />
     </div>
   )
 }
@@ -164,7 +167,7 @@ export default function BuilderClient({ experience }: { experience: Record<strin
     </label>
   )
 
-  const autoSlug = useMemo(() => (slugEdited ? slug : slugify(titleEN)), [slug, slugEdited, titleEN])
+  const autoSlug = useMemo(() => (slugEdited ? slug : slugify(registrationTitleText(titleEN))), [slug, slugEdited, titleEN])
   const startDate = values.start_date
 
   function isoOrNull(localValue: string): string | null {
@@ -175,8 +178,9 @@ export default function BuilderClient({ experience }: { experience: Record<strin
 
   function validate(): string[] {
     const problems: string[] = []
-    if (!titleEN.trim()) problems.push('Step 1: An English title is required.')
-    if (!values.summary_en.trim()) problems.push('Step 1: A short English description is required.')
+    if (!registrationTitleText(titleEN)) problems.push('Step 1: An English title is required.')
+    if (!registrationTitleText(values.summary_en)) problems.push('Step 1: A short English description is required.')
+    if (Array.from(values.summary_en).length > 10000) problems.push('Step 1: The English short description must be 10,000 characters or fewer.')
     if (!autoSlug) problems.push('Step 1: A URL slug is required.')
     if (!startDate) problems.push('Step 2: A start date is required.')
     if (locationType !== 'online' && !values.location_en.trim()) problems.push('Step 2: A location name is required for physical events.')
@@ -356,11 +360,11 @@ export default function BuilderClient({ experience }: { experience: Record<strin
         <div className={step !== 0 ? 'hidden' : ''}>
           <Section title="Basic information">
             <Grid>
-              <Field label="Registration title (English)" required>
-                <input className={inputClass} onChange={(event) => setTitleEN(event.target.value)} value={titleEN} />
+              <Field label="Registration header (English)" help="Paste or write HTML with inline styles, or use the formatting buttons." required>
+                <RichText maxLength={10000} name="title_en" onChange={setTitleEN} value={titleEN} />
               </Field>
-              <Field label="Registration title (Amharic)">
-                <input className={inputClass} dir="auto" onChange={(event) => update('title_am', event.target.value)} value={values.title_am} />
+              <Field label="Registration header (Amharic)" help="Paste or write HTML with inline styles, or use the formatting buttons.">
+                <RichText dir="auto" maxLength={10000} name="title_am" onChange={(value) => update('title_am', value)} value={values.title_am} />
               </Field>
               <Field label="URL slug" help={`Public URL: /register/${autoSlug || 'your-title'}`}>
                 <input className={inputClass} onChange={(event) => { setSlug(event.target.value); setSlugEdited(true) }} value={autoSlug} />
@@ -372,18 +376,18 @@ export default function BuilderClient({ experience }: { experience: Record<strin
               </Field>
             </Grid>
             <Grid className="mt-4">
-              <Field label="Short description (English)" required>
-                <textarea className={inputClass} maxLength={500} onChange={(event) => update('summary_en', event.target.value)} rows={3} value={values.summary_en} />
+              <Field label="Short description (English)" help="Paste or write HTML with inline styles, or use the formatting buttons." required>
+                <RichText maxLength={10000} name="summary_en" onChange={(value) => update('summary_en', value)} value={values.summary_en} />
               </Field>
               <Field label="Short description (Amharic)">
                 <textarea className={inputClass} dir="auto" onChange={(event) => update('summary_am', event.target.value)} rows={3} value={values.summary_am} />
               </Field>
             </Grid>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Field label="Full description (English)">
+              <Field label="Full description (English)" help="Paste HTML or Markdown here for formatted headings, paragraphs, and lists.">
                 <RichText name="description_en" onChange={setDescriptionEN} value={descriptionEN} />
               </Field>
-              <Field label="Full description (Amharic)">
+              <Field label="Full description (Amharic)" help="Paste HTML or Markdown here for formatted headings, paragraphs, and lists.">
                 <RichText name="description_am" onChange={setDescriptionAM} value={descriptionAM} />
               </Field>
             </div>
@@ -392,7 +396,7 @@ export default function BuilderClient({ experience }: { experience: Record<strin
 
         {/* Step 2 */}
         <div className={step !== 1 ? 'hidden' : ''}>
-          <Section title="Date, time and location">
+          <Section description="Give guests a clear picture of when and where this experience happens." title="Date, time and location">
             <Grid>
               <Field label="Start date & time" required><input className={inputClass} onChange={(event) => update('start_date', event.target.value)} required type="datetime-local" value={values.start_date} /></Field>
               <Field label="End date & time"><input className={inputClass} onChange={(event) => update('end_date', event.target.value)} type="datetime-local" value={values.end_date} /></Field>
@@ -411,8 +415,8 @@ export default function BuilderClient({ experience }: { experience: Record<strin
             </Grid>
             {locationType !== 'online' && (
               <Grid className="mt-4">
-                <Field label="Location name (English)" required><input className={inputClass} onChange={(event) => update('location_en', event.target.value)} value={values.location_en} /></Field>
-                <Field label="Location name (Amharic)"><input className={inputClass} dir="auto" onChange={(event) => update('location_am', event.target.value)} value={values.location_am} /></Field>
+                <Field label="Location name (English)" help="Maximum 200 characters." required><input className={inputClass} maxLength={200} onChange={(event) => update('location_en', event.target.value)} value={values.location_en} /></Field>
+                <Field label="Location name (Amharic)" help="Maximum 200 characters."><input className={inputClass} dir="auto" maxLength={200} onChange={(event) => update('location_am', event.target.value)} value={values.location_am} /></Field>
                 <Field label="Full address"><input className={inputClass} onChange={(event) => update('address', event.target.value)} value={values.address} /></Field>
                 <Field label="Google Maps URL"><input className={inputClass} onChange={(event) => update('maps_url', event.target.value)} type="url" value={values.maps_url} /></Field>
               </Grid>
@@ -429,11 +433,14 @@ export default function BuilderClient({ experience }: { experience: Record<strin
 
         {/* Step 3 */}
         <div className={step !== 2 ? 'hidden' : ''}>
-          <Section title="Registration configuration">
+          <Section description="Set capacity, opening dates, and the way guests can register and pay." title="Registration configuration">
             <SubHeading>Capacity</SubHeading>
-            <label className="flex items-center gap-2 text-sm font-medium text-zinc-800">
-              <input checked={unlimited} className="h-4 w-4 accent-emerald-700" onChange={(event) => setUnlimited(event.target.checked)} type="checkbox" />
-              Unlimited registration
+            <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${unlimited ? 'border-emerald-300 bg-gradient-to-r from-emerald-50 to-white shadow-sm' : 'border-zinc-200 bg-zinc-50/70 hover:border-zinc-300'}`}>
+              <input checked={unlimited} className="mt-1 h-4 w-4 accent-emerald-700" onChange={(event) => setUnlimited(event.target.checked)} type="checkbox" />
+              <span>
+                <span className="block text-sm font-bold text-zinc-900">Unlimited registration</span>
+                <span className="mt-0.5 block text-xs text-zinc-500">Keep registration open without a participant cap.</span>
+              </span>
             </label>
             {!unlimited && (
               <Grid className="mt-3">
@@ -448,10 +455,24 @@ export default function BuilderClient({ experience }: { experience: Record<strin
             </Grid>
             <div className="mt-2">{check('allow_after_start', 'Allow registration after the event starts')}</div>
             <SubHeading>Pricing</SubHeading>
-            <div className="flex flex-wrap gap-2">
-              {(['free', 'paid', 'tickets'] as const).map((mode) => (
-                <button className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${pricingMode === mode ? 'border-emerald-700 bg-emerald-50 text-emerald-800' : 'border-zinc-300 bg-white text-zinc-600 hover:border-zinc-400'}`} key={mode} onClick={() => setPricingMode(mode)} type="button">
-                  {mode === 'free' ? 'Free' : mode === 'paid' ? 'Single price' : 'Multiple ticket types'}
+            <div className="grid gap-3 sm:grid-cols-3">
+              {([
+                ['free', 'Free', 'No payment required', '✦'],
+                ['paid', 'Single price', 'One price for everyone', '◈'],
+                ['tickets', 'Ticket types', 'Offer multiple options', '▤'],
+              ] as const).map(([mode, label, detail, icon]) => (
+                <button
+                  aria-pressed={pricingMode === mode}
+                  className={`group flex min-h-24 items-start gap-3 rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-0.5 ${pricingMode === mode ? 'border-emerald-400 bg-gradient-to-br from-emerald-50 to-white shadow-[0_10px_28px_rgba(16,46,38,0.10)] ring-2 ring-emerald-600/10' : 'border-zinc-200 bg-white hover:border-emerald-200 hover:shadow-md'}`}
+                  key={mode}
+                  onClick={() => setPricingMode(mode)}
+                  type="button"
+                >
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg ${pricingMode === mode ? 'bg-emerald-700 text-white' : 'bg-zinc-100 text-zinc-500 group-hover:bg-emerald-50 group-hover:text-emerald-700'}`}>{icon}</span>
+                  <span>
+                    <span className="block text-sm font-bold text-zinc-900">{label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-zinc-500">{detail}</span>
+                  </span>
                 </button>
               ))}
             </div>
@@ -552,7 +573,7 @@ export default function BuilderClient({ experience }: { experience: Record<strin
               {values.image_url && (
                 <div className="sm:col-span-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="Current cover" className="h-36 w-64 rounded-xl border border-zinc-200 object-cover" src={values.image_url} />
+                  <img alt="Current cover" className="block h-auto max-h-[32rem] max-w-full rounded-xl border border-zinc-200 bg-zinc-50 object-contain" src={values.image_url} />
                 </div>
               )}
               <Field label="Promotional video URL (YouTube/Vimeo)"><input className={inputClass} onChange={(event) => update('video_url', event.target.value)} type="url" value={values.video_url} /></Field>
@@ -606,8 +627,10 @@ export default function BuilderClient({ experience }: { experience: Record<strin
               <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">Desktop preview</p>
                 <div className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50 p-5">
-                  <p className="text-2xl font-bold text-zinc-950">{titleEN || 'Untitled registration'}</p>
-                  <p className="mt-1 text-sm text-zinc-500">{values.summary_en}</p>
+                  {titleEN
+                    ? <ExperienceDescription content={titleEN} variant="title" />
+                    : <h1 className="mt-3 text-2xl font-bold text-zinc-950">Untitled registration</h1>}
+                  <ExperienceDescription content={values.summary_en} variant="summary" />
                   <p className="mt-2 text-xs text-zinc-400">{values.location_en || 'Location TBA'} · {startDate ? new Date(startDate).toLocaleString() : 'Date TBA'}</p>
                   <p className="mt-3 inline-block rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
                     {pricingMode === 'free' ? 'Free' : pricingMode === 'paid' ? `${values.price || '?'} ${values.currency}` : `${tickets.length} ticket types`}
@@ -635,8 +658,12 @@ export default function BuilderClient({ experience }: { experience: Record<strin
               <div className="mx-auto w-72 rounded-[2rem] border-4 border-zinc-800 bg-white p-3 shadow-lg">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">Mobile preview · አማርኛ</p>
                 <div className="mt-2 rounded-xl bg-zinc-50 p-4">
-                  <p className="text-lg font-bold text-zinc-950">{values.title_am || titleEN}</p>
-                  <p className="mt-1 text-xs text-zinc-500" dir="auto">{values.summary_am || values.summary_en}</p>
+                  {(values.title_am || titleEN)
+                    ? <ExperienceDescription content={values.title_am || titleEN} variant="title" />
+                    : <h1 className="mt-3 text-lg font-bold text-zinc-950">Untitled registration</h1>}
+                  {values.summary_am
+                    ? <p className="mt-1 text-xs text-zinc-500" dir="auto">{values.summary_am}</p>
+                    : <ExperienceDescription content={values.summary_en} variant="summary" />}
                   <button className="mt-3 w-full rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white" type="button">ምዝገባ (Register)</button>
                   <p className="mt-3 text-[11px] text-zinc-400">Amharic visitors see translated titles, summaries, and ticket names automatically.</p>
                 </div>
@@ -664,11 +691,18 @@ export default function BuilderClient({ experience }: { experience: Record<strin
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 className="text-lg font-bold text-zinc-950">{title}</h2>
-      <div className="mt-4">{children}</div>
+    <section className="overflow-hidden rounded-[1.75rem] border border-emerald-950/10 bg-white shadow-[0_18px_55px_rgba(16,46,38,0.07)] ring-1 ring-white">
+      <header className="flex items-start gap-4 border-b border-zinc-100 bg-gradient-to-r from-emerald-50/80 via-white to-amber-50/60 px-5 py-5 sm:px-7">
+        <span className="mt-1 h-10 w-1.5 shrink-0 rounded-full bg-gradient-to-b from-emerald-700 to-amber-400" />
+        <div>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-700">Registration builder</p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-zinc-950 sm:text-2xl">{title}</h2>
+          {description && <p className="mt-1.5 max-w-2xl text-sm leading-6 text-zinc-500">{description}</p>}
+        </div>
+      </header>
+      <div className="p-5 sm:p-7">{children}</div>
     </section>
   )
 }
@@ -685,5 +719,11 @@ function Field({ label, children, help, required }: { label: string; children: R
   )
 }
 function SubHeading({ children }: { children: React.ReactNode }) {
-  return <p className="mt-5 mb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500">{children}</p>
+  return (
+    <h3 className="mt-7 mb-3 flex items-center gap-3 text-[11px] font-extrabold uppercase tracking-[0.18em] text-emerald-900 first:mt-0">
+      <span className="h-px w-5 rounded-full bg-amber-400" />
+      {children}
+      <span className="h-px flex-1 bg-zinc-100" />
+    </h3>
+  )
 }

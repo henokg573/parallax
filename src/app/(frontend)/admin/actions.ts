@@ -20,6 +20,7 @@ import {
   sendTelegramMessage,
   sendVerifiedRegistrationTicketEmail,
 } from '@/lib/telegram'
+import { registrationTitleText } from '@/lib/registration-title'
 
 function value(formData: FormData, key: string, maxLength: number) {
   const field = formData.get(key)
@@ -315,8 +316,21 @@ export async function saveContent(formData: FormData) {
   const currentVideoID = optionalID(value(formData, 'video_id', 20))
 
   if (section === 'experience') {
-    const title = value(formData, 'title_en', 200)
-    const summary = value(formData, 'summary_en', 5000)
+    const rawTitle = formData.get('title_en')
+    const rawTitleAM = formData.get('title_am')
+    if (
+      (typeof rawTitle === 'string' && Array.from(rawTitle.trim()).length > 10000) ||
+      (typeof rawTitleAM === 'string' && Array.from(rawTitleAM.trim()).length > 10000)
+    ) {
+      throw new Error('Registration headers must be 10,000 characters or fewer.')
+    }
+    const title = value(formData, 'title_en', 10000)
+    const titleAM = value(formData, 'title_am', 10000)
+    const rawSummary = formData.get('summary_en')
+    if (typeof rawSummary === 'string' && Array.from(rawSummary.trim()).length > 10000) {
+      throw new Error('The English short description must be 10,000 characters or fewer.')
+    }
+    const summary = value(formData, 'summary_en', 10000)
     const location = value(formData, 'location_en', 200)
     const kind = value(formData, 'kind', 20)
     const currency = value(formData, 'currency', 3).toUpperCase()
@@ -325,7 +339,7 @@ export async function saveContent(formData: FormData) {
     const imageURL = value(formData, 'image_url', 1000)
     const resourceURL = value(formData, 'resource_url', 1000)
     const imageFile = formData.get('image_file')
-    if (!title || !summary || !location || !['trip', 'event', 'faith', 'workshop', 'other'].includes(kind)) {
+    if (!registrationTitleText(title) || !registrationTitleText(summary) || !location || !['trip', 'event', 'faith', 'workshop', 'other'].includes(kind)) {
       throw new Error('Complete the required experience fields.')
     }
     if (imageURL && !/^https?:\/\//i.test(imageURL)) throw new Error('Enter a valid image URL.')
@@ -344,11 +358,11 @@ export async function saveContent(formData: FormData) {
     const videoID = await saveContentVideo(formData, currentVideoID)
     const resourceID = await saveContentResource(formData, optionalID(value(formData, 'resource_id', 20)))
     const values = {
-      slug: slugify(value(formData, 'slug', 190) || title),
+      slug: slugify(value(formData, 'slug', 190) || registrationTitleText(title)),
       title_en: title,
-      title_am: value(formData, 'title_am', 200),
+      title_am: titleAM,
       kind,
-      summary_en: value(formData, 'summary_en', 5000),
+      summary_en: summary,
       summary_am: value(formData, 'summary_am', 5000),
       location_en: value(formData, 'location_en', 200),
       location_am: value(formData, 'location_am', 200),
@@ -638,7 +652,7 @@ export async function updateRegistration(formData: FormData) {
   if (status !== registration.payment_status && status !== 'pending') {
     const notification = await sendRegistrationNotification({
       id: registration.id,
-      experienceTitle: experienceRows[0]?.title_en || `Experience ${registration.experience_id}`,
+      experienceTitle: registrationTitleText(experienceRows[0]?.title_en || '') || `Experience ${registration.experience_id}`,
       fullName: registration.full_name,
       email: registration.email,
       phone: registration.phone,
@@ -653,7 +667,7 @@ export async function updateRegistration(formData: FormData) {
     const result = await sendVerifiedRegistrationTicketEmail({
       to: registration.email,
       fullName: registration.full_name,
-      experienceTitle: experienceRows[0]?.title_en || `Experience ${registration.experience_id}`,
+      experienceTitle: registrationTitleText(experienceRows[0]?.title_en || '') || `Experience ${registration.experience_id}`,
       registrationID: registration.id,
       checkInToken: registration.check_in_token,
     })

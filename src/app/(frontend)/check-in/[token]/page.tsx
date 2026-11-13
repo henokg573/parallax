@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise'
 import { getAdminSession } from '@/lib/admin-auth'
 import { rows } from '@/lib/db'
 import { confirmCheckIn } from './actions'
+import { registrationTitleText } from '@/lib/registration-title'
 
 type CheckInRow = RowDataPacket & {
   id: number
@@ -38,7 +39,7 @@ export default async function CheckInPage({
     eq: { id: registration.experience_id },
     limit: 1,
   })
-  registration.experience_title = experiences[0]?.title_en || 'Parallax experience'
+  registration.experience_title = registrationTitleText(experiences[0]?.title_en || '') || 'Parallax experience'
 
   const verified = registration.payment_status === 'verified'
   const checkedIn = Boolean(registration.checked_in_at || query.checked === '1')

@@ -18,7 +18,7 @@ export function Badge({ value, className = '' }: { value: string; className?: st
 }
 
 export const card = 'rounded-2xl border border-zinc-200 bg-white shadow-sm'
-export const inputClass = 'mt-1.5 w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15'
+export const inputClass = 'mt-1.5 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 shadow-[0_2px_8px_rgba(16,46,38,0.04)] outline-none transition placeholder:text-zinc-400 hover:border-zinc-300 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10'
 export const primaryButton = 'rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/40'
 export const ghostButton = 'rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition hover:border-zinc-400 hover:bg-zinc-50'
 export const dangerButton = 'rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 shadow-sm transition hover:border-red-300 hover:bg-red-50'

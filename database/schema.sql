@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS media_tags (
 CREATE TABLE IF NOT EXISTS experiences (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   slug VARCHAR(190) NOT NULL,
-  title_en VARCHAR(200) NOT NULL,
-  title_am VARCHAR(200) NOT NULL DEFAULT '',
+  title_en MEDIUMTEXT NOT NULL,
+  title_am MEDIUMTEXT NOT NULL,
   kind ENUM('trip', 'event', 'faith', 'workshop', 'other') NOT NULL DEFAULT 'trip',
   summary_en TEXT NOT NULL,
   summary_am TEXT NOT NULL,

@@ -2,6 +2,11 @@
 -- Additive only — safe for existing data.
 
 ALTER TABLE experiences
+  MODIFY COLUMN title_en MEDIUMTEXT NOT NULL,
+  MODIFY COLUMN title_am MEDIUMTEXT NOT NULL,
+  MODIFY COLUMN summary_en TEXT NOT NULL;
+
+ALTER TABLE experiences
   ADD COLUMN IF NOT EXISTS description_en MEDIUMTEXT NOT NULL,
   ADD COLUMN IF NOT EXISTS description_am MEDIUMTEXT NOT NULL,
   ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) NOT NULL DEFAULT 'Africa/Addis_Ababa',

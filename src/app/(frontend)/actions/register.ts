@@ -9,6 +9,7 @@ import {
   sendRegistrationNotification,
   sendRegistrationReceiptNotification,
 } from '@/lib/telegram'
+import { registrationTitleText } from '@/lib/registration-title'
 
 export type RegistrationState = {
   success: boolean
@@ -153,7 +154,7 @@ export async function registerForExperience(
       })
       const registration = {
         id: Number(registrationID),
-        experienceTitle: experiences[0]?.title_en || `Experience ${experience}`,
+        experienceTitle: registrationTitleText(experiences[0]?.title_en || '') || `Experience ${experience}`,
         fullName,
         email,
         phone,

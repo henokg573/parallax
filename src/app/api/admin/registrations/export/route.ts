@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminSession } from '@/lib/admin-auth'
 import { listRegistrations, listParticipants } from '@/lib/registrations'
+import { registrationTitleText } from '@/lib/registration-title'
 
 function csvEscape(value: unknown) {
   const text = String(value ?? '')
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
   const csv = toCSV(
     ['ID', 'Title (EN)', 'Title (AM)', 'Slug', 'Category', 'Event date', 'Capacity', 'Participants', 'Verified', 'Revenue', 'Currency', 'Pricing', 'Status', 'Created at'],
     registrations.map((item) => [
-      item.id, item.title_en, item.title_am, item.slug, item.kind, item.start_date,
+      item.id, registrationTitleText(item.title_en), registrationTitleText(item.title_am), item.slug, item.kind, item.start_date,
       item.unlimited_capacity ? 'unlimited' : item.capacity ?? '', item.participant_count, item.verified_count,
       item.revenue, item.currency, item.pricing_mode, item.status, item.created_at,
     ]),

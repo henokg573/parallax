@@ -3,6 +3,8 @@ import QRCode from 'qrcode'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { requireAdmin } from '@/lib/admin-auth'
+import { registrationTitleText } from '@/lib/registration-title'
+import { ExperienceDescription } from '@/app/(frontend)/components/ExperienceDescription'
 import { getExperienceFull, listParticipants, CATEGORY_LABELS } from '@/lib/registrations'
 import AdminShell from '../../admin-shell'
 import { Badge, card, primaryButton, ghostButton, dangerButton, inputClass, fieldLabel, money, formatDate } from '../shared'
@@ -72,7 +74,7 @@ export default async function RegistrationDetailPage({
     : []
 
   return (
-    <AdminShell admin={admin} active="/admin/registrations" title={experience.title_en || 'Registration'} subtitle={`${CATEGORY_LABELS[experience.kind] ?? experience.kind} · ${formatDate(experience.start_date)}`}>
+    <AdminShell admin={admin} active="/admin/registrations" title={registrationTitleText(experience.title_en) || 'Registration'} subtitle={`${CATEGORY_LABELS[experience.kind] ?? experience.kind} · ${formatDate(experience.start_date)}`}>
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
         <Link className="font-semibold text-emerald-800 hover:underline" href="/admin/registrations">← All registrations</Link>
         <Badge value={experience.status} />
@@ -120,7 +122,7 @@ export default async function RegistrationDetailPage({
         <div className="mt-5 grid gap-4 lg:grid-cols-3">
           <section className={`${card} p-6 lg:col-span-2`}>
             <h2 className="text-sm font-bold text-zinc-950">Registration summary</h2>
-            <p className="mt-2 text-sm text-zinc-600">{experience.summary_en}</p>
+            <ExperienceDescription content={experience.summary_en} variant="summary" />
             <dl className="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <Row label="Category" value={CATEGORY_LABELS[experience.kind] ?? experience.kind} />
               <Row label="Event date" value={formatDate(experience.start_date)} />

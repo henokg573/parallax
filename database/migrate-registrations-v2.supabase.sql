@@ -1,19 +1,16 @@
 -- Registrations v2 migration — additive only. Safe for existing data.
 -- Run in the Supabase SQL Editor. Re-runnable (idempotent).
+-- If `publish_status` is an enum, first run
+-- `migrate-registration-status-enum.supabase.sql` by itself and let it commit.
+
+ALTER TABLE public.experiences
+  ALTER COLUMN title_en TYPE text USING title_en::text,
+  ALTER COLUMN title_am TYPE text USING title_am::text,
+  ALTER COLUMN summary_en TYPE text USING summary_en::text;
 
 -- The app now supports 12 registration categories. The legacy `kind` column is
 -- a restricted enum (experience_kind) that lacks the new values, so widen it to
 -- plain text first. Existing values are preserved.
--- Also extend the publish-status enum so 'unpublished' is a legal value.
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
-    WHERE t.typname = 'publish_status'
-  ) THEN
-    ALTER TYPE public.publish_status ADD VALUE IF NOT EXISTS 'unpublished';
-  END IF;
-END $$;
 
 -- Some deployments ship an 'unpublish' enum value variant; normalize those rows.
 UPDATE public.experiences SET status = 'unpublished' WHERE status::text = 'unpublish';

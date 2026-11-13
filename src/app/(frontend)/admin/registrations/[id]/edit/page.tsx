@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { requireAdmin } from '@/lib/admin-auth'
 import { getExperienceFull } from '@/lib/registrations'
+import { registrationTitleText } from '@/lib/registration-title'
 import AdminShell from '../../../admin-shell'
 import BuilderClient from '../../new/BuilderClient'
 
@@ -17,7 +18,7 @@ export default async function EditRegistrationPage({ params }: { params: Promise
   if (!experience) notFound()
 
   return (
-    <AdminShell admin={admin} active="/admin/registrations" title={`Edit: ${experience.title_en}`} subtitle="Update this registration opportunity.">
+    <AdminShell admin={admin} active="/admin/registrations" title={`Edit: ${registrationTitleText(experience.title_en)}`} subtitle="Update this registration opportunity.">
       <BuilderClient experience={experience as unknown as Record<string, unknown>} />
     </AdminShell>
   )

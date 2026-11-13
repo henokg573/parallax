@@ -6,6 +6,7 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { rows } from '@/lib/db'
 import { publicMediaURL } from '@/lib/storage'
 import AdminShell, { roleLabel } from '../admin-shell'
+import { registrationTitleText } from '@/lib/registration-title'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,7 @@ type AdminRecord = Record<string, string | number | null>
 type Field = {
   name: string
   label: string
+  help?: string
   type?: 'text' | 'url' | 'number' | 'datetime-local' | 'textarea' | 'select' | 'checkbox'
   options?: string[]
   required?: boolean
@@ -30,11 +32,11 @@ const sections = {
       LEFT JOIN media vm ON vm.id = e.video_id
       ORDER BY e.start_date DESC LIMIT 200`,
     fields: [
-      { name: 'title_en', label: 'Title (English)', required: true },
-      { name: 'title_am', label: 'Title (Amharic)' },
+      { name: 'title_en', label: 'Registration header (English)', type: 'textarea', help: 'Paste HTML with inline styles for a formatted header.', required: true },
+      { name: 'title_am', label: 'Registration header (Amharic)', type: 'textarea', help: 'Paste HTML with inline styles for a formatted header.' },
       { name: 'slug', label: 'URL slug' },
       { name: 'kind', label: 'Registration type', type: 'select', options: ['event', 'trip', 'faith', 'workshop', 'other'] },
-      { name: 'summary_en', label: 'Summary (English)', type: 'textarea', required: true },
+      { name: 'summary_en', label: 'Short description (English)', type: 'textarea', help: 'Paste HTML with inline styles for a formatted description.', required: true },
       { name: 'summary_am', label: 'Summary (Amharic)', type: 'textarea' },
       { name: 'location_en', label: 'Location (English)', required: true },
       { name: 'location_am', label: 'Location (Amharic)' },
@@ -142,7 +144,7 @@ async function getSectionRecords(sectionName: SectionName): Promise<AdminRecord[
       rows<{ id: number; title_en: string }>('experiences', { select: 'id, title_en' }),
       rows<{ id: number; original_filename: string }>('payment_receipts', { select: 'id, original_filename' }),
     ])
-    const experienceTitles = new Map(experiences.map((item) => [item.id, item.title_en]))
+    const experienceTitles = new Map(experiences.map((item) => [item.id, registrationTitleText(item.title_en)]))
     const receiptNames = new Map(receipts.map((item) => [item.id, item.original_filename]))
     return registrations.map((record) => ({
       ...record,
@@ -249,8 +251,9 @@ function ContentForm({
         return (
           <label className={`grid gap-1 text-sm font-medium text-zinc-800 ${field.type === 'textarea' ? 'sm:col-span-2' : ''}`} key={field.name}>
             {field.label}
+            {field.help && <span className="text-xs font-normal text-zinc-500">{field.help}</span>}
             {field.type === 'textarea' ? (
-              <textarea className={inputClass} defaultValue={String(value)} name={field.name} rows={field.name.startsWith('body_') ? 10 : 3} required={field.required} />
+              <textarea className={inputClass} defaultValue={String(value)} dir={field.name === 'title_am' ? 'auto' : undefined} maxLength={section === 'experience' && (field.name.startsWith('title_') || field.name === 'summary_en') ? 10000 : undefined} name={field.name} rows={field.name.startsWith('body_') ? 10 : 3} required={field.required} />
             ) : field.type === 'select' ? (
               <select className={`${inputClass} capitalize`} defaultValue={formattedValue(value) || field.options?.[0]} name={field.name} required={field.required}>
                 {field.options?.map((option) => <option className="capitalize" key={option} value={option}>{option}</option>)}
@@ -653,7 +656,8 @@ export default async function AdminSectionPage({
 
           {/* Records */}
           {records.map((record) => {
-            const label = String(record.title_en || record.caption_en || record.platform || `Record ${record.id}`)
+            const rawLabel = String(record.title_en || record.caption_en || record.platform || `Record ${record.id}`)
+            const label = sectionName === 'experiences' ? registrationTitleText(rawLabel) : rawLabel
             return (
               <Card key={record.id}>
                 <details>
