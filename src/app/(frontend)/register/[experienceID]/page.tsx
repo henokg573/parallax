@@ -149,8 +149,10 @@ export default async function RegistrationPage({ params, searchParams }: Registr
         {/* Hero */}
         <section className="mt-4 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
           {cover ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img alt={title} className="block h-auto w-full" src={cover} />
+            <div className="flex w-full justify-center bg-zinc-50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt={title} className="block h-auto max-h-56 max-w-full object-contain sm:max-h-72" src={cover} />
+            </div>
           ) : (
             <div className="aspect-[21/9] w-full bg-gradient-to-br from-emerald-900 to-emerald-700" />
           )}

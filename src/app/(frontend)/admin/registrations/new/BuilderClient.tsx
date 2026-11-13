@@ -573,7 +573,7 @@ export default function BuilderClient({ experience }: { experience: Record<strin
               {values.image_url && (
                 <div className="sm:col-span-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="Current cover" className="block h-auto max-h-[32rem] max-w-full rounded-xl border border-zinc-200 bg-zinc-50 object-contain" src={values.image_url} />
+                  <img alt="Current cover" className="block h-auto max-h-72 max-w-full rounded-xl border border-zinc-200 bg-zinc-50 object-contain" src={values.image_url} />
                 </div>
               )}
               <Field label="Promotional video URL (YouTube/Vimeo)"><input className={inputClass} onChange={(event) => update('video_url', event.target.value)} type="url" value={values.video_url} /></Field>
