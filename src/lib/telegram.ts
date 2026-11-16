@@ -46,13 +46,17 @@ export async function sendTelegramMessage(text: string): Promise<TelegramResult>
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
     })
-    const result = await response.json() as { ok?: boolean }
+    const result = await response.json() as { ok?: boolean; error_code?: number; description?: string }
     if (response.ok && result.ok) return { ok: true }
 
-    console.error('[telegram] Bot API rejected a notification.', { status: response.status })
+    console.error('[telegram] Bot API rejected a notification.', {
+      status: response.status,
+      code: result.error_code,
+      description: result.description,
+    })
     return { ok: false, reason: 'rejected' }
-  } catch {
-    console.error('[telegram] Notification request failed.')
+  } catch (error) {
+    console.error('[telegram] Notification request failed.', error instanceof Error ? error.message : error)
     return { ok: false, reason: 'request_failed' }
   }
 }
@@ -89,8 +93,8 @@ async function sendTelegramDocument(
 
     console.error('[telegram] Bot API rejected a receipt document.', { status: response.status })
     return { ok: false, reason: 'rejected' }
-  } catch {
-    console.error('[telegram] Receipt document request failed.')
+  } catch (error) {
+    console.error('[telegram] Receipt document request failed.', error instanceof Error ? error.message : error)
     return { ok: false, reason: 'request_failed' }
   }
 }
@@ -183,10 +187,14 @@ export async function sendRegistrationConfirmationEmail(options: {
       signal: AbortSignal.timeout(10_000),
     })
     if (response.ok) return { ok: true }
-    console.error('[resend] Confirmation email rejected.', { status: response.status })
+    const body = await response.json().catch(() => null) as { name?: unknown; message?: unknown } | null
+    console.error('[resend] Confirmation email rejected.', {
+      status: response.status,
+      ...(body ? { code: body.name, message: body.message } : {}),
+    })
     return { ok: false, reason: 'rejected' }
-  } catch {
-    console.error('[resend] Confirmation email request failed.')
+  } catch (error) {
+    console.error('[resend] Confirmation email request failed.', error instanceof Error ? error.message : error)
     return { ok: false, reason: 'request_failed' }
   }
 }
@@ -235,15 +243,14 @@ export async function sendVerifiedRegistrationTicketEmail(options: {
     })
     if (response.ok) return { ok: true }
 
-    const body = await response.json().catch(() => null) as { name?: unknown } | null
-    const code = typeof body?.name === 'string' ? body.name : undefined
+    const body = await response.json().catch(() => null) as { name?: unknown; message?: unknown } | null
     console.error('[resend] Ticket email rejected.', {
       status: response.status,
-      ...(code ? { code } : {}),
+      ...(body ? { code: body.name, message: body.message } : {}),
     })
     return { ok: false, reason: 'rejected' }
-  } catch {
-    console.error('[resend] Ticket email request failed.')
+  } catch (error) {
+    console.error('[resend] Ticket email request failed.', error instanceof Error ? error.message : error)
     return { ok: false, reason: 'request_failed' }
   }
 }
