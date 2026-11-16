@@ -3,8 +3,9 @@ import { createClient, createPublicClient } from '@/utils/supabase/server'
 
 export const PUBLIC_MEDIA_BUCKET = 'parallax-media'
 export const PRIVATE_RECEIPTS_BUCKET = 'parallax-receipts'
+export const FEEDBACK_BUCKET = 'parallax-feedback'
 
-type StorageBucket = typeof PUBLIC_MEDIA_BUCKET | typeof PRIVATE_RECEIPTS_BUCKET
+type StorageBucket = typeof PUBLIC_MEDIA_BUCKET | typeof PRIVATE_RECEIPTS_BUCKET | typeof FEEDBACK_BUCKET
 
 async function getStorage(publicAccess = false) {
   const cookieStore = await cookies()

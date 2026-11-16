@@ -147,7 +147,44 @@ export default async function RegistrationPage({ params, searchParams }: Registr
         </div>
 
         {/* Hero */}
-        <section className="mt-4 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+        <section className="relative mt-4 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+          {experience.pricing_mode === 'paid' && experience.price !== null && (
+            <div className="absolute right-3 top-3 z-10 flex w-36 flex-col items-stretch gap-2 sm:right-5 sm:top-5 sm:w-44">
+              <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-400 to-amber-500 px-3 py-2.5 text-center shadow-xl shadow-amber-900/25 sm:px-4 sm:py-3">
+                <span className="block text-[9px] font-extrabold uppercase leading-tight tracking-[0.12em] text-amber-950 sm:text-[10px]">{t('Registration fee', 'የምዝገባ ክፍያ')}</span>
+                <span className="mt-0.5 block text-3xl font-black leading-none tracking-tight text-white drop-shadow-sm sm:text-5xl">
+                  {experience.price.toLocaleString()}
+                  <span className="ml-1 align-middle text-base font-extrabold text-amber-950 sm:text-xl">{experience.currency}</span>
+                </span>
+                <span className="mt-1 block text-[9px] font-bold leading-tight text-amber-950/90 sm:text-[10px]">{t('Lunch & refreshments included', 'ምሳና መጠጦች ተካተቋል')}</span>
+              </div>
+              {gate.open && (
+                <a
+                  className="rounded-xl bg-emerald-600 px-3 py-2 text-center text-xs font-extrabold uppercase tracking-wider text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-700 sm:text-sm"
+                  href="#register"
+                >
+                  {t('Register now', 'አሁን ይመዝገቡ')} ↓
+                </a>
+              )}
+            </div>
+          )}
+          {experience.pricing_mode === 'free' && (
+            <div className="absolute right-3 top-3 z-10 flex w-36 flex-col items-stretch gap-2 sm:right-5 sm:top-5 sm:w-44">
+              <div className="rounded-2xl border-2 border-lime-300 bg-lime-500 px-3 py-2.5 text-center shadow-xl shadow-lime-900/25 sm:px-4 sm:py-3">
+                <span className="block text-[9px] font-extrabold uppercase leading-tight tracking-[0.12em] text-lime-950 sm:text-[10px]">{t('Registration fee', 'የምዝገባ ክፍያ')}</span>
+                <span className="mt-0.5 block text-3xl font-black leading-none tracking-tight text-white drop-shadow-sm sm:text-5xl">{t('FREE', 'ነጻ')}</span>
+                <span className="mt-1 block text-[9px] font-bold leading-tight text-lime-950/90 sm:text-[10px]">{t('Lunch & refreshments included', 'ምሳና መጠጦች ተካተቋል')}</span>
+              </div>
+              {gate.open && (
+                <a
+                  className="rounded-xl bg-emerald-600 px-3 py-2 text-center text-xs font-extrabold uppercase tracking-wider text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-700 sm:text-sm"
+                  href="#register"
+                >
+                  {t('Register now', 'አሁን ይመዝገቡ')} ↓
+                </a>
+              )}
+            </div>
+          )}
           {cover ? (
             <div className="flex w-full justify-center bg-zinc-50">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -180,9 +217,9 @@ export default async function RegistrationPage({ params, searchParams }: Registr
                 </dt>
                 <dd className="mt-4 text-sm font-semibold leading-6 text-zinc-800">
                   <time dateTime={experience.start_date}>
-                    {new Date(experience.start_date).toLocaleString(locale === 'am' ? 'am-ET' : undefined, { dateStyle: 'full', timeStyle: 'short' })}
+                    {new Date(experience.start_date).toLocaleString(locale === 'am' ? 'am-ET' : undefined, { dateStyle: 'full', timeStyle: 'short', timeZone: experience.timezone || undefined })}
                   </time>
-                  {experience.end_date && <> — {new Date(experience.end_date).toLocaleTimeString(undefined, { timeStyle: 'short' })}</>}
+                  {experience.end_date && <> — {new Date(experience.end_date).toLocaleTimeString(undefined, { timeStyle: 'short', timeZone: experience.timezone || undefined })}</>}
                 </dd>
                 <dd className="mt-1.5 flex items-center gap-2 text-xs font-medium text-zinc-500">
                   <svg aria-hidden="true" className="h-4 w-4 text-emerald-700" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24">
@@ -245,21 +282,21 @@ export default async function RegistrationPage({ params, searchParams }: Registr
                 <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500">{t('Ticket types', 'የትኬት ዓይነቶች')}</h2>
                 <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                   {ticketTypes.map((ticket, index) => (
-                    <li className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white px-4 py-3.5 shadow-sm" key={index}>
-                      <p className="font-semibold text-zinc-900">{t(ticket.name_en, ticket.name_am)}</p>
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-extrabold tabular-nums text-emerald-800">{ticket.price > 0 ? `${ticket.price.toLocaleString()} ${experience.currency}` : t('Free', 'ነጻ')}</span>
+                    <li className="flex items-center justify-between rounded-2xl border-2 border-emerald-200 bg-white px-4 py-3.5 shadow-sm transition hover:border-emerald-400" key={index}>
+                      <p className="font-bold text-zinc-900">{t(ticket.name_en, ticket.name_am)}</p>
+                      <span className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-lg font-black tabular-nums text-white">{ticket.price > 0 ? `${ticket.price.toLocaleString()} ${experience.currency}` : t('Free', 'ነጻ')}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
             {experience.pricing_mode === 'paid' && experience.price !== null && (
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-900/10 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-800 px-5 py-4 text-white shadow-lg shadow-emerald-950/10">
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border-2 border-amber-400 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 px-5 py-4 text-white shadow-lg shadow-amber-900/20">
                 <span>
-                  <span className="block text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-100/80">{t('Registration fee', 'የምዝገባ ክፍያ')}</span>
-                  <span className="mt-1 block text-2xl font-extrabold tracking-tight">{experience.price.toLocaleString()} <span className="text-sm font-bold text-emerald-100">{experience.currency}</span></span>
+                  <span className="block text-[10px] font-extrabold uppercase tracking-[0.2em] text-amber-950/80">{t('Registration fee (Lunch and refreshments included)', 'የምዝገባ ክፍያ (ልክና ማሻሻያ ተካትፎ ግንኙነት)')} — {t('pay this amount', 'ይህ መጠን ይከፍሉ')}</span>
+                  <span className="mt-1 block text-5xl font-black leading-none tracking-tight sm:text-6xl">{experience.price.toLocaleString()} <span className="text-xl font-extrabold text-amber-950 sm:text-2xl">{experience.currency}</span></span>
                 </span>
-                <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-emerald-50">{t('Your place awaits', 'ቦታዎ ይጠብቃል')}</span>
+                <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-amber-900 shadow-sm sm:text-sm">{t('Your place awaits', 'ቦታዎ ይጠብቃል')}</span>
               </div>
             )}
             {experience.payment_instructions && (
@@ -274,7 +311,11 @@ export default async function RegistrationPage({ params, searchParams }: Registr
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-100/75">{t('Payment details', 'የክፍያ ዝርዝሮች')}</p>
                     <p className="mt-1 text-base font-bold">{t('Payment instructions', 'የክፍያ መመሪያ')}</p>
-                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-white/90">{experience.payment_instructions}</p>
+                    <p className="mt-2 whitespace-pre-line text-base font-bold leading-7">{experience.payment_instructions}</p>
+                    <p className="mt-3 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold leading-6 text-emerald-50">
+                      {t('What your payment covers:', 'ክፍያዎ የሚሸፍነው:')}
+                      {' '}{t('lunch and refreshments', 'ምሳና መጠጦች።')}
+                    </p>
                     {experience.payment_methods && (
                       <div className="mt-4 flex flex-wrap items-center gap-2">
                         <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-emerald-100/70">{t('Accepted', 'የሚቀበሉ')}</span>
@@ -335,6 +376,11 @@ export default async function RegistrationPage({ params, searchParams }: Registr
               <h2 className="text-2xl font-extrabold tracking-tight text-zinc-950">{t('Register now', 'አሁን ይመዝገቡ')}</h2>
               <span className="rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-xs font-bold text-emerald-800">{gate.open ? t('Registration is open', 'ምዝገባ ክፍት ነው') : t('Stay tuned', 'ይጠብቁ')}</span>
             </div>
+            {experience.pricing_mode === 'paid' && experience.price !== null && (
+              <p className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-2.5 text-base font-extrabold text-amber-950 sm:text-lg">
+                {t('Registration fee (Lunch and refreshments included):', 'የምዝገባ ክፍያ (ልክና ማሻሻያ ተካትፎ ግንኙነት):')} {experience.price.toLocaleString()} {experience.currency} — {t('transfer this exact amount and enter the transaction reference below.', 'ትክክለኛውን መጠን ያስተላልፉና የግብይቱን ማጣቀሻ ከታች ያስገቡ።')}
+              </p>
+            )}
             <p className="mt-1.5 max-w-2xl text-sm leading-6 text-zinc-600">{t('A few details are all we need to save your place.', 'ቦታዎን ለማስያዝ ጥቂት መረጃዎች ብቻ ያስፈልጋሉ።')}</p>
           </div>
           <div className="p-5 sm:p-8">
