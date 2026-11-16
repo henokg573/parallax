@@ -126,11 +126,9 @@ async function insertWithClient<T = { id: number }>(
   return data as T
 }
 
-export async function publicInsert<T = { id: number }>(
-  table: string,
-  values: Record<string, unknown>,
-): Promise<T> {
-  return insertWithClient<T>(createPublicClient(await cookies()), table, values)
+export async function publicInsert(table: string, values: Record<string, unknown>): Promise<void> {
+  const { error } = await createPublicClient(await cookies()).from(table).insert(values)
+  if (error) throw new Error(error.message)
 }
 
 export async function publicRpc<T = unknown>(
