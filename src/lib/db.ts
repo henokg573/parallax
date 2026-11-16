@@ -101,7 +101,9 @@ export async function update(
   let query = supabase.from(table).update(values)
 
   for (const [col, val] of Object.entries(eq)) {
-    query = query.eq(col, val)
+    // PostgREST null matching must use `is`; eq(col, null) serializes the
+    // string "null" and fails on typed columns (e.g. timestamptz).
+    query = val === null ? query.is(col, null) : query.eq(col, val)
   }
 
   const { error } = await query
@@ -146,7 +148,7 @@ export async function remove(table: string, eq: Record<string, unknown>) {
   let query = supabase.from(table).delete()
 
   for (const [col, val] of Object.entries(eq)) {
-    query = query.eq(col, val)
+    query = val === null ? query.is(col, null) : query.eq(col, val)
   }
 
   const { error } = await query
