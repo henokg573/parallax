@@ -208,6 +208,11 @@ const copy = {
       'Stories from Telegram, TikTok, Instagram, YouTube, and Facebook—curated by the Parallax team.',
     viewOriginal: 'View original',
     socialEmpty: 'The social wall is ready for your first curated post.',
+    feedbackKicker: 'RATED BY THE COMMUNITY',
+    feedbackTitle: 'What attendees say.',
+    feedbackEmphasis: 'In their words.',
+    feedbackDescription: 'Real ratings and photos shared after our experiences—approved by the Parallax team.',
+    feedbackEmpty: 'Approved attendee feedback will appear here after the next experience.',
     reelKicker: 'FROM THE COMMUNITY',
     reelFollow: 'Follow our socials',
     reelWatch: 'Watch more',
@@ -282,6 +287,11 @@ const copy = {
     socialDescription: 'ከቴሌግራም፣ ቲክቶክ፣ ኢንስታግራም፣ ዩቲዩብ እና ፌስቡክ የተመረጡ ታሪኮች።',
     viewOriginal: 'ዋናውን ይመልከቱ',
     socialEmpty: 'ማህበራዊ ገጹ ለመጀመሪያው ልጥፍዎ ዝግጁ ነው።',
+    feedbackKicker: 'የማህበረሰብ ደረጃ',
+    feedbackTitle: 'ተሳታፊዎች ምን እንዲሉ።',
+    feedbackEmphasis: 'በራሳቸው ቃል።',
+    feedbackDescription: 'ከተሞክሮዎቻችን በኋላ የተጋሩ እውነተኛ ደረጃዎችና ፎቶዎች—በፓራላክስ ቡድን ጸድቀዋል።',
+    feedbackEmpty: 'የጸደቁ የተሳታፊ ግብረ-መልሶች ከቀጣዩ ተሞክሮ በኋላ እዚህ ይታያሉ።',
     reelKicker: 'ከማህበረሰቡ',
     reelFollow: 'ማህበራዊ ገጾቻችንን ይከተሉ',
     reelWatch: 'ተጨማሪ ይመልከቱ',
@@ -333,7 +343,7 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
   const [subscribed, setSubscribed] = useState(false)
   const [reelIndex, setReelIndex] = useState(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
-  const { experiences, stories, socialPosts, socialLinks } = content[language]
+  const { experiences, stories, socialPosts, socialLinks, feedbackHighlights, averageRating, feedbackCount } = content[language]
   const t = copy[language]
   const featured = experiences[0]
   const story = stories[0]
@@ -520,6 +530,18 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
                 <em>{t.heroEmphasis}</em>
               </h1>
               <p className="hero-description">{t.heroDescription}</p>
+              {averageRating !== null && (
+                <p
+                  className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur"
+                  aria-label={`Average rating ${averageRating} out of 5 from ${feedbackCount} approved reviews`}
+                >
+                  <span className="text-[#e5c779]" aria-hidden="true">★</span>
+                  {averageRating.toFixed(1)} / 5
+                  <span className="text-xs font-semibold text-white/70">
+                    · {feedbackCount} {feedbackCount === 1 ? 'review' : 'reviews'}
+                  </span>
+                </p>
+              )}
               <div className="hero-actions">
                 <a className="button button-gold" href="#events">
                   {t.explore} <Icon name="arrow" />
@@ -912,6 +934,53 @@ export function ParallaxHome({ content }: { content: Record<'en' | 'am', PublicH
             </div>
           ) : (
             <div className="social-empty">{t.socialEmpty}</div>
+          )}
+
+          {feedbackHighlights.length > 0 && (
+            <div className="mt-12">
+              <div className="section-kicker">
+                <span>05</span>
+                <p>{t.feedbackKicker}</p>
+              </div>
+              <div className="social-heading">
+                <h2>
+                  {t.feedbackTitle}
+                  <br />
+                  <em>{t.feedbackEmphasis}</em>
+                </h2>
+                <p>{t.feedbackDescription}</p>
+              </div>
+              <div className="social-grid">
+                {feedbackHighlights.map((item) => (
+                  <article
+                    className="social-card"
+                    key={String(item.id)}
+                    style={{ cursor: 'default' }}
+                  >
+                    {item.image && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.image.url} alt={item.image.alt} loading="lazy" />
+                    )}
+                    <span aria-label={`${item.rating} out of 5 stars`} className="feedback-stars">
+                      {'★'.repeat(item.rating)}
+                      <span className="text-black/25">{'★'.repeat(5 - item.rating)}</span>
+                    </span>
+                    {item.message && <p>{item.message}</p>}
+                    {item.voice && (
+                      <audio
+                        className="feedback-voice"
+                        controls
+                        preload="none"
+                        src={item.voice.url}
+                        style={{ position: 'relative', zIndex: 1, width: '100%', marginTop: 8 }}
+                      />
+                    )}
+                    {!item.message && !item.voice && <p>{'—'}</p>}
+                    <small>{item.name}</small>
+                  </article>
+                ))}
+              </div>
+            </div>
           )}
         </section>
 

@@ -681,6 +681,33 @@ export async function updateRegistration(formData: FormData) {
   redirect(`/admin/registrations?saved=1${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}`)
 }
 
+export async function setFeedbackApproval(formData: FormData) {
+  const admin = await getAdminSession()
+  if (!admin || admin.role === 'check-in') redirect('/admin/login')
+
+  const id = positiveID(value(formData, 'id', 20))
+  if (!id) throw new Error('Invalid feedback ID.')
+  const approve = value(formData, 'approve', 10) === 'true'
+
+  await update('feedback', {
+    approved: approve,
+    approved_at: approve ? new Date().toISOString() : null,
+    approved_by: approve ? admin.id : null,
+  }, { id })
+
+  redirect('/admin/feedback?saved=1')
+}
+
+export async function deleteFeedback(formData: FormData) {
+  const admin = await getAdminSession()
+  if (!admin || admin.role !== 'super-admin') redirect('/admin/login')
+
+  const id = positiveID(value(formData, 'id', 20))
+  if (!id) throw new Error('Invalid feedback ID.')
+  await remove('feedback', { id })
+  redirect('/admin/feedback?deleted=1')
+}
+
 export async function createAdmin(formData: FormData) {
   const admin = await getAdminSession()
   if (!admin || admin.role !== 'super-admin') redirect('/admin')

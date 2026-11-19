@@ -52,11 +52,23 @@ export type PublicSocialPost = {
   video: PublicVideo | null
 }
 
+export type PublicFeedbackHighlight = {
+  id: string | number
+  name: string
+  rating: number
+  message: string
+  image: { url: string; alt: string } | null
+  voice: { url: string; durationSeconds: number | null } | null
+}
+
 export type PublicHomeContent = {
   experiences: PublicExperience[]
   stories: PublicStory[]
   socialPosts: PublicSocialPost[]
   socialLinks: SocialLink[]
+  feedbackHighlights: PublicFeedbackHighlight[]
+  averageRating: number | null
+  feedbackCount: number
 }
 
 export type SocialLink = {
@@ -164,8 +176,50 @@ async function getPublicExperiences(): Promise<ExperienceRow[]> {
   }
 }
 
+type FeedbackRow = {
+  id: number
+  full_name: string | null
+  rating: number
+  message: string
+  photo_path: string | null
+  voice_path: string | null
+  voice_duration_seconds: number | null
+}
+
+export async function getApprovedFeedback(): Promise<FeedbackRow[]> {
+  return rows<FeedbackRow>('feedback', {
+    select: 'id, full_name, rating, message, photo_path, voice_path, voice_duration_seconds',
+    eq: { approved: true },
+    order: { column: 'created_at', ascending: false },
+    limit: 12,
+  }).catch(() => [] as FeedbackRow[])
+}
+
+export function approvedFeedbackSummary(items: FeedbackRow[]) {
+  return {
+    feedbackHighlights: items.map((item) => ({
+      id: item.id,
+      name: item.full_name || 'Anonymous',
+      rating: item.rating,
+      message: item.message,
+      image: item.photo_path ? {
+        url: `/api/feedback-photo?path=${encodeURIComponent(item.photo_path)}`,
+        alt: `Photo from ${item.full_name || 'an anonymous attendee'}`,
+      } : null,
+      voice: item.voice_path ? {
+        url: `/api/feedback-photo?path=${encodeURIComponent(item.voice_path)}`,
+        durationSeconds: item.voice_duration_seconds ?? null,
+      } : null,
+    })),
+    averageRating: items.length
+      ? Math.round((items.reduce((sum, item) => sum + item.rating, 0) / items.length) * 10) / 10
+      : null,
+    feedbackCount: items.length,
+  }
+}
+
 export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicHomeContent> {
-  const [experiences, stories, socialPosts, socialLinks] = await Promise.all([
+  const [experiences, stories, socialPosts, socialLinks, approvedFeedback] = await Promise.all([
     getPublicExperiences(),
     rows<StoryRow>('stories', {
       select: 'id, title_en, title_am, excerpt_en, excerpt_am, body_en, body_am, author_name_en, author_name_am, image_id, video_id',
@@ -180,6 +234,7 @@ export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicH
       eq: { visible: true },
       order: { column: 'platform' },
     }).catch(() => []),
+    getApprovedFeedback(),
   ])
 
   const mediaIDs = [...experiences.flatMap((item) => [item.image_id, item.video_id, item.resource_id]), ...stories.flatMap((item) => [item.image_id, item.video_id]), ...socialPosts.flatMap((item) => [item.thumbnail_id, item.video_id])]
@@ -231,5 +286,6 @@ export async function getPublicHomeContent(locale: 'en' | 'am'): Promise<PublicH
       video: videoValue(mediaByID.get(item.video_id ?? -1)),
     })),
     socialLinks,
+    ...approvedFeedbackSummary(approvedFeedback),
   }
 }

@@ -7,6 +7,7 @@ import { registrationTitleText } from '@/lib/registration-title'
 import AdminShell from '../admin-shell'
 import { formatDate } from '../registrations/shared'
 import { FEEDBACK_BUCKET, downloadStorageFile } from '@/lib/storage'
+import { setFeedbackApproval } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,8 @@ type FeedbackRow = {
   document_name: string | null
   voice_path: string | null
   created_at: string
+  approved: boolean
+  approved_at: string | null
 }
 
 export default async function FeedbackAdminPage() {
@@ -51,8 +54,9 @@ export default async function FeedbackAdminPage() {
     if (bytes) photoPreviews.set(item.id, `data:image/*;base64,${bytes.toString('base64')}`)
   }
 
-  const average = feedback.length
-    ? (feedback.reduce((sum, item) => sum + item.rating, 0) / feedback.length).toFixed(1)
+  const approvedFeedback = feedback.filter((item) => item.approved)
+  const average = approvedFeedback.length
+    ? (approvedFeedback.reduce((sum, item) => sum + item.rating, 0) / approvedFeedback.length).toFixed(1)
     : '—'
 
   // Prefer the origin the admin is actually browsing (works in local dev and
@@ -77,6 +81,14 @@ export default async function FeedbackAdminPage() {
         </div>
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Average rating</p>
+          <p className="mt-1 text-3xl font-black text-amber-500">{average} ★</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Approved</p>
+          <p className="mt-1 text-3xl font-black text-zinc-950">{approvedFeedback.length}</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Average rating (approved)</p>
           <p className="mt-1 text-3xl font-black text-amber-500">{average} ★</p>
         </div>
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -113,7 +125,14 @@ export default async function FeedbackAdminPage() {
           <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm" key={item.id}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-sm font-extrabold text-zinc-950">{item.full_name || <span className="italic text-zinc-400">Anonymous</span>}</p>
+                <p className="text-sm font-extrabold text-zinc-950">
+              {item.full_name || <span className="italic text-zinc-400">Anonymous</span>}
+              {item.approved && (
+                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+                  ✓ On site
+                </span>
+              )}
+            </p>
                 <p className="text-xs font-semibold text-zinc-500">
                   {item.experience_id ? experienceTitles.get(item.experience_id) ?? `Experience #${item.experience_id}` : 'General'} · {formatDate(item.created_at)}
                 </p>
@@ -144,6 +163,41 @@ export default async function FeedbackAdminPage() {
                 <audio controls src={`/api/feedback-file?path=${encodeURIComponent(item.voice_path)}`} />
               )}
             </div>
+
+            <form action={setFeedbackApproval} className="mt-4 flex flex-wrap gap-2 border-t border-zinc-100 pt-4">
+              <input name="id" type="hidden" value={item.id} />
+              {item.approved ? (
+                <>
+                  <button
+                    className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-bold text-zinc-700 transition hover:bg-zinc-50"
+                    name="approve"
+                    type="submit"
+                    value="false"
+                  >
+                    Unpublish from site
+                  </button>
+                  {item.photo_path && (
+                    <a
+                      className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-bold text-zinc-700 transition hover:bg-zinc-50"
+                      href={`/api/feedback-photo?path=${encodeURIComponent(item.photo_path)}`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      View public photo
+                    </a>
+                  )}
+                </>
+              ) : (
+                <button
+                  className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800"
+                  name="approve"
+                  type="submit"
+                  value="true"
+                >
+                  Approve &amp; repost to site
+                </button>
+              )}
+            </form>
           </article>
         ))}
       </div>
