@@ -9,6 +9,7 @@ import {
   sendRegistrationNotification,
   sendRegistrationReceiptNotification,
 } from '@/lib/telegram'
+import { sendRegistrationConfirmationSMS } from '@/lib/sms'
 import { registrationTitleText } from '@/lib/registration-title'
 
 export type RegistrationState = {
@@ -146,6 +147,7 @@ export async function registerForExperience(
 
     let notificationFailed = false
     let emailFailed = false
+    let smsFailed = false
     try {
       const experiences = await publicRows<{ title_en: string }>('experiences', {
         select: 'title_en',
@@ -184,6 +186,15 @@ export async function registerForExperience(
       } else {
         emailFailed = true
       }
+
+      // Confirmation SMS to the registrant via SMSEthiopia.
+      const confirmationSMS = await sendRegistrationConfirmationSMS({
+        phone: registration.phone,
+        fullName,
+        experienceTitle: registration.experienceTitle,
+        registrationID: registration.id,
+      })
+      smsFailed = !confirmationSMS.ok
     } catch (error) {
       notificationFailed = true
       console.error('[telegram] New registration notification could not be prepared.', error)
@@ -193,7 +204,7 @@ export async function registerForExperience(
       success: true,
       message: copy.success,
       notificationWarning: notificationFailed ? copy.notificationWarning : undefined,
-      emailWarning: emailFailed ? copy.emailWarning : undefined,
+      emailWarning: emailFailed || smsFailed ? copy.emailWarning : undefined,
     }
   } catch (error) {
     if (receiptStoragePath) await removeStorageFile(PRIVATE_RECEIPTS_BUCKET, receiptStoragePath).catch(() => undefined)

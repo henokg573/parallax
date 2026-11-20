@@ -9,6 +9,10 @@ import { insert, rows, update } from '@/lib/db'
 import { PUBLIC_MEDIA_BUCKET, removeStorageFile, uploadStorageFile } from '@/lib/storage'
 import { REGISTRATION_STATUS_VALUES } from '@/lib/registrations'
 import { sendRegistrationNotification, sendVerifiedRegistrationTicketEmail } from '@/lib/telegram'
+import {
+  sendRejectedRegistrationSMS,
+  sendVerifiedRegistrationTicketSMS,
+} from '@/lib/sms'
 import { registrationTitleText } from '@/lib/registration-title'
 
 function value(formData: FormData, key: string, max: number) {
@@ -573,9 +577,30 @@ export async function verifyParticipant(formData: FormData) {
     }
   }
 
+  // Status SMS to the registrant via SMSEthiopia (verified ticket link / rejection notice).
+  let smsFailure: 'not_configured' | 'request_failed' | 'rejected' | null = null
+  if (decision !== registration.payment_status && decision !== 'pending' && registration.phone) {
+    const experienceTitle = registrationTitleText(experienceRows[0]?.title_en || '') || `Experience ${registration.experience_id}`
+    const smsResult = decision === 'verified'
+      ? await sendVerifiedRegistrationTicketSMS({
+          phone: registration.phone,
+          fullName: registration.full_name,
+          experienceTitle,
+          registrationID: registration.id,
+          checkInToken: registration.check_in_token,
+        })
+      : await sendRejectedRegistrationSMS({
+          phone: registration.phone,
+          fullName: registration.full_name,
+          experienceTitle,
+          registrationID: registration.id,
+        })
+    smsFailure = smsResult.ok ? null : smsResult.reason
+  }
+
   revalidatePath(`/admin/registrations/${experienceID}`)
   const telegramFailure = notification.ok ? null : notification.reason
-  redirect(`/admin/registrations/${experienceID}?verified=${decision}${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}`)
+  redirect(`/admin/registrations/${experienceID}?verified=${decision}${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}${smsFailure ? `&sms=${smsFailure}` : ''}`)
 }
 
 export async function retryRegistrationNotifications(formData: FormData) {
@@ -628,10 +653,22 @@ export async function retryRegistrationNotifications(formData: FormData) {
     }
   }
 
+  let smsFailure: 'not_configured' | 'request_failed' | 'rejected' | null = null
+  if (registration.phone) {
+    const smsResult = await sendVerifiedRegistrationTicketSMS({
+      phone: registration.phone,
+      fullName: registration.full_name,
+      experienceTitle,
+      registrationID: registration.id,
+      checkInToken: registration.check_in_token,
+    })
+    smsFailure = smsResult.ok ? null : smsResult.reason
+  }
+
   await logActivity('notification-retry', '', id)
   revalidatePath(`/admin/registrations/${registration.experience_id}`)
   const telegramFailure = notification.ok ? null : notification.reason
-  redirect(`/admin/registrations/${registration.experience_id}?retried=1${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}`)
+  redirect(`/admin/registrations/${registration.experience_id}?retried=1${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}${smsFailure ? `&sms=${smsFailure}` : ''}`)
 }
 
 export async function bulkVerifyParticipants(formData: FormData) {
@@ -678,6 +715,25 @@ export async function bulkVerifyParticipants(formData: FormData) {
         paymentReference: registration.payment_reference,
       }, decision as 'verified' | 'rejected')
       telegramFailed ||= !notification.ok
+      // Status SMS per registration in the bulk run.
+      if (registration.phone) {
+        const experienceTitle = registrationTitleText(experienceTitles.get(registration.experience_id) || '') || `Experience ${registration.experience_id}`
+        const smsResult = decision === 'verified'
+          ? await sendVerifiedRegistrationTicketSMS({
+              phone: registration.phone,
+              fullName: registration.full_name,
+              experienceTitle,
+              registrationID: registration.id,
+              checkInToken: registration.check_in_token,
+            })
+          : await sendRejectedRegistrationSMS({
+              phone: registration.phone,
+              fullName: registration.full_name,
+              experienceTitle,
+              registrationID: registration.id,
+            })
+        telegramFailed ||= !smsResult.ok
+      }
     }
   }
   revalidatePath(`/admin/registrations/${experienceID}`)

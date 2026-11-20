@@ -20,6 +20,7 @@ import {
   sendTelegramMessage,
   sendVerifiedRegistrationTicketEmail,
 } from '@/lib/telegram'
+import { sendRejectedRegistrationSMS, sendVerifiedRegistrationTicketSMSWithURL } from '@/lib/sms'
 import { registrationTitleText } from '@/lib/registration-title'
 
 function value(formData: FormData, key: string, maxLength: number) {
@@ -663,6 +664,7 @@ export async function updateRegistration(formData: FormData) {
   }
 
   let emailFailure: 'not_configured' | 'request_failed' | 'rejected' | null = null
+  let smsFailure: 'not_configured' | 'request_failed' | 'rejected' | null = null
   if (status === 'verified' && registration && !registration.ticket_email_sent_at) {
     const result = await sendVerifiedRegistrationTicketEmail({
       to: registration.email,
@@ -678,7 +680,31 @@ export async function updateRegistration(formData: FormData) {
     }
   }
 
-  redirect(`/admin/registrations?saved=1${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}`)
+  // Status SMS to the registrant via SMSEthiopia (verified ticket link / rejection notice).
+  if (status !== registration.payment_status && registration.phone) {
+    const experienceTitle = registrationTitleText(experienceRows[0]?.title_en || '') || `Experience ${registration.experience_id}`
+    if (status === 'verified') {
+      const siteURL = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/+$/, '')
+      const result = await sendVerifiedRegistrationTicketSMSWithURL({
+        phone: registration.phone,
+        fullName: registration.full_name,
+        experienceTitle,
+        registrationID: registration.id,
+        checkInURL: `${siteURL}/check-in/${registration.check_in_token}`,
+      })
+      smsFailure = result.ok ? null : result.reason
+    } else if (status === 'rejected') {
+      const result = await sendRejectedRegistrationSMS({
+        phone: registration.phone,
+        fullName: registration.full_name,
+        experienceTitle,
+        registrationID: registration.id,
+      })
+      smsFailure = result.ok ? null : result.reason
+    }
+  }
+
+  redirect(`/admin/registrations?saved=1${emailFailure ? `&email=${emailFailure}` : ''}${telegramFailure ? `&telegram=${telegramFailure}` : ''}${smsFailure ? `&sms=${smsFailure}` : ''}`)
 }
 
 export async function setFeedbackApproval(formData: FormData) {
